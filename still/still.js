@@ -191,11 +191,134 @@
   $('#plus').addEventListener('click', () => { Spa.audio.ensure(); app.setMinutes(app.minutes + 5, true); });
 
   /* ───────── session visuals ───────── */
-  const orb = $('#orb'), orbWrap = $('.orb-wrap');
+  const orbWrap = $('.orb-wrap');
   const orbCenter = () => {
     const b = orbWrap.getBoundingClientRect();
     return { x: b.left + b.width / 2, y: b.top + b.height / 2, r: b.width / 2 };
   };
+
+  /* The breathing sphere, drawn in WebGL: a hollow globe of fine stone-coloured dots with a
+     warm rim, turning slowly while a brighter swell drifts across its surface. It is in focus
+     only at the turn of each breath, at its largest and smallest; while it grows and shrinks
+     it drifts out of focus, the dots softening into a haze. Without WebGL the CSS .orb stays. */
+  const SHELL_SCALE = 1.6; // canvas size relative to .orb-wrap; keep in step with .shell in still.css
+  const shell = (() => {
+    const cv = document.createElement('canvas');
+    cv.className = 'shell';
+    cv.setAttribute('aria-hidden', 'true');
+    const gl = cv.getContext('webgl', { premultipliedAlpha: true, antialias: false });
+    if (!gl) return null;
+
+    const VS = 'attribute vec2 a; void main(){ gl_Position = vec4(a, 0.0, 1.0); }';
+    const FS = `
+      precision highp float;
+      uniform vec2 uRes;
+      uniform float uT, uR, uBlur, uPat, uKind;
+      uniform mat3 uM;
+      const float PI = 3.14159265;
+      const float ROWS = 62.0;
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+      // Dots on a latitude grid, fewer per row toward the poles so they stay evenly spaced.
+      // Out of focus they spread into their average coverage.
+      float dots(vec3 q){
+        float lat = asin(clamp(q.y, -1.0, 1.0));
+        float lon = atan(q.z, q.x);
+        float v = (lat / PI + 0.5) * ROWS;
+        float latC = ((floor(v) + 0.5) / ROWS - 0.5) * PI;
+        float ncol = max(1.0, floor(2.0 * ROWS * cos(latC)));
+        float u = (lon / (2.0 * PI) + 0.5) * ncol;
+        vec2 d = vec2((fract(u) - 0.5) * 2.0 * cos(lat) * ROWS / ncol, fract(v) - 0.5);
+        float sharp = 1.0 - smoothstep(0.12, 0.26, length(d));
+        return mix(sharp, 0.15, uBlur);
+      }
+      // Where the dots brighten: drifting swells and one slow band.
+      float swell(vec3 q){
+        float a = sin(3.1 * q.x + uT * 0.7) * sin(2.3 * q.y - uT * 0.5 + 1.7) * sin(2.7 * q.z + uT * 0.6 + 0.4);
+        float band = exp(-pow(q.y + 0.35 * sin(2.0 * q.x + uT * 0.4) - 0.5 * sin(uT * 0.23), 2.0) * 7.0);
+        return 0.15 + 1.3 * max(a, 0.0) + 1.4 * band;
+      }
+      // At the smallest, for a beat, the dots light up in a figure. uKind picks it.
+      float figure(vec3 q){
+        float lat = asin(clamp(q.y, -1.0, 1.0)), lon = atan(q.z, q.x);
+        if (uKind < 0.5)                                    // three rings of latitude
+          return exp(-pow(q.y / 0.07, 2.0)) + 0.8 * exp(-pow((abs(q.y) - 0.55) / 0.05, 2.0));
+        if (uKind < 1.5) return pow(max(0.0, sin(lon * 3.0 + lat * 6.0)), 14.0);   // a spiral
+        return pow(max(0.0, cos(lon * 6.0)), 18.0);                                // meridians
+      }
+      void main(){
+        vec2 p = ((gl_FragCoord.xy / uRes) * 2.0 - 1.0) / uR;
+        float r = length(p);
+        float soft = 0.008 + 0.09 * uBlur;
+        float inside = 1.0 - smoothstep(1.0 - soft, 1.0 + soft, r);
+        float rim = exp(-pow((r - 1.0) / (0.022 + 0.08 * uBlur), 2.0));
+        float z = sqrt(max(0.0, 1.0 - min(r, 1.0) * min(r, 1.0)));
+        vec3 pf = normalize(vec3(p, z)), pb = normalize(vec3(p, -z));
+        vec3 qf = uM * pf, qb = uM * pb;
+        float fres = pow(1.0 - z, 2.5);
+
+        vec3 stone = vec3(0.84, 0.81, 0.75), sand = vec3(0.92, 0.74, 0.52), amber = vec3(1.0, 0.7, 0.4);
+        float sf = swell(qf), sb = swell(qb);
+        float dim = mix(1.0, 0.15, uPat);
+        float df = dots(qf) * (sf * (0.12 + 1.0 * fres) * dim + figure(qf) * uPat * 1.1);
+        float db = dots(qb) * (sb * 0.4 * (0.15 + 0.85 * fres) * dim + figure(qb) * uPat * 0.5);
+        vec3 col = (stone * db + mix(stone, sand, fres) * df) * inside;
+        col += mix(stone, amber, clamp(sf - 0.9, 0.0, 1.0)) * df * 0.25 * inside; // warmer where it swells
+        col += mix(sand, amber, 0.5) * rim * (0.6 - 0.3 * uBlur);
+        float a = clamp(max(col.r, max(col.g, col.b)), 0.0, 1.0);
+        col += (hash(gl_FragCoord.xy + fract(uT * 7.0) * 311.0) - 0.5) * 0.05 * a; // film grain
+        gl_FragColor = vec4(col, a);
+      }`;
+    const sh = (type, src) => {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, src); gl.compileShader(s);
+      return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null;
+    };
+    const vs = sh(gl.VERTEX_SHADER, VS), fs = sh(gl.FRAGMENT_SHADER, FS);
+    if (!vs || !fs) return null;
+    const prog = gl.createProgram();
+    gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return null;
+    gl.useProgram(prog);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const aLoc = gl.getAttribLocation(prog, 'a');
+    gl.enableVertexAttribArray(aLoc);
+    gl.vertexAttribPointer(aLoc, 2, gl.FLOAT, false, 0, 0);
+    const u = {};
+    ['uRes', 'uT', 'uR', 'uBlur', 'uM', 'uPat', 'uKind'].forEach((n) => (u[n] = gl.getUniformLocation(prog, n)));
+
+    orbWrap.prepend(cv);
+    orbWrap.classList.add('gl');
+
+    let size = 0;
+    return function draw(t, b) {
+      const px = Math.round(cv.clientWidth * Math.min(2, devicePixelRatio || 1));
+      if (px !== size) { size = cv.width = cv.height = px; gl.viewport(0, 0, px, px); }
+      // Focus: sharp at the turn of each breath, softest midway through it.
+      const f = b.inhale ? b.p / Spa.INHALE : (b.p - Spa.INHALE) / Spa.EXHALE;
+      const blur = Math.pow(Math.sin(Math.PI * clamp(f, 0, 1)), 0.7);
+      // A slow turn about a tilted axis.
+      const ay = t * 0.12, ax = 0.4;
+      const cy = Math.cos(ay), sy = Math.sin(ay), cx = Math.cos(ax), sx = Math.sin(ax);
+      gl.uniform2f(u.uRes, px, px);
+      gl.uniform1f(u.uT, t);
+      // Radius in timer-ring units (the ring sits at 0.96): from 0.68 breathed out to 1.22
+      // breathed in, well past the ring. The canvas is 1.6x the ring box to leave room.
+      gl.uniform1f(u.uR, (0.68 + 0.54 * b.k) / SHELL_SCALE);
+      gl.uniform1f(u.uBlur, blur);
+      // The pattern shows around the turn from out-breath to in-breath, a new figure each breath.
+      // Not while the session opens (the settle and the opening inhale, cycles -1 and 0):
+      // the first one comes at the end of the first out-breath.
+      const near = b.inhale ? 1 - Spa.ease(f / 0.4) : Spa.ease((f - 0.6) / 0.4);
+      const opened = b.inhale ? b.cycle >= 1 : b.cycle >= 0;
+      gl.uniform1f(u.uPat, opened ? near : 0);
+      gl.uniform1f(u.uKind, ((b.inhale ? b.cycle : b.cycle + 1) + 2) % 3); // rings first, then spiral, meridians
+      gl.uniformMatrix3fv(u.uM, false, [cy, sx * sy, -cx * sy, 0, cx, sx, sy, -sx * cy, cx * cy]);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    };
+  })();
 
   let nextAmbient = 0;
   Spa.audio.onEvent = (type, d) => {
@@ -221,8 +344,10 @@
       scene.ripple(scene.W / 2, scene.H / 2, { max: Math.hypot(scene.W, scene.H) * 0.7, life: 10, rings: 4, gap: 26, alpha: 0.24 });
     },
     frame(dt, t, s) {
+      const b = s.breath;
       if (s.phase === 'session') {
-        orb.style.transform = `scale(${0.72 + 0.28 * s.breath.k})`;
+        if (shell) shell(t, b);
+        else orbWrap.style.setProperty('--k', b.k.toFixed(3)); // CSS fallback: scale and edge softness
       } else if (t > nextAmbient) {
         // A slow drip into the pool every few seconds while idle.
         nextAmbient = t + 5 + Math.random() * 6;

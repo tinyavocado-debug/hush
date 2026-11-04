@@ -117,20 +117,40 @@ body[data-phase="session"] .dusk { opacity: 0.38; }
   display: grid;
   place-items: center;
 }
-.orb {
+/* A soft-focus sphere in Cairn's stone tones. Its edge blurs in and out with the
+   breath (--k: 0 fully out, 1 fully in), and a film grain sits on top, unblurred. */
+.orb, .orb-grain {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 38% 30%, rgba(255, 247, 230, 0.28), rgba(255, 247, 230, 0) 42%),
-    radial-gradient(circle, rgba(143, 174, 159, 0.22) 0%, rgba(47, 90, 82, 0.12) 55%, rgba(18, 48, 46, 0) 72%);
-  box-shadow: 0 0 120px rgba(242, 197, 138, 0.12), inset 0 0 60px rgba(234, 223, 203, 0.06);
-  will-change: transform;
+  transform: scale(calc(0.72 + 0.28 * var(--k, 0)));
+  will-change: transform, filter;
 }
+.orb {
+  background:
+    radial-gradient(circle at 34% 24%, rgba(204, 198, 186, 0.95), rgba(204, 198, 186, 0) 52%),
+    radial-gradient(circle at 74% 74%, rgba(178, 150, 118, 0.75), rgba(178, 150, 118, 0) 50%),
+    radial-gradient(circle at 26% 72%, rgba(118, 132, 127, 0.85), rgba(118, 132, 127, 0) 55%),
+    radial-gradient(circle, #8c877e 0%, #716d66 60%, #5c5953 100%);
+  filter: blur(calc(20px - 14px * var(--k, 0)));
+  box-shadow: 0 0 120px rgba(242, 197, 138, 0.1);
+}
+.orb-grain {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  mix-blend-mode: soft-light;
+  opacity: 0.75;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(circle closest-side, #000 82%, transparent 100%);
+  mask-image: radial-gradient(circle closest-side, #000 82%, transparent 100%);
+}
+/* With WebGL, the dot-sphere canvas (still.js) replaces the CSS sphere above. It is 1.6x the
+   ring box (SHELL_SCALE in still.js), so the sphere can swell past the timer ring. */
+.shell { position: absolute; left: -30%; top: -30%; width: 160%; height: 160%; pointer-events: none; }
+.orb-wrap.gl .orb, .orb-wrap.gl .orb-grain { display: none; }
 .ring { position: absolute; inset: 0; width: 100%; height: 100%; }
 .ring-track { fill: none; stroke: rgba(234, 223, 203, 0.08); stroke-width: 0.5; }
 .ring-fill { fill: none; stroke: rgba(234, 223, 203, 0.6); stroke-width: 0.6; stroke-linecap: round; }
-.time { position: relative; font-size: calc(var(--orb) * 0.22); color: var(--ink); }
+.time { position: relative; font-size: calc(var(--orb) * 0.22); color: var(--ink); text-shadow: 0 1px 14px rgba(0, 0, 0, 0.4); }
 .time.long { font-size: calc(var(--orb) * 0.16); }
 .session .breath { margin-top: 28px; }
 
