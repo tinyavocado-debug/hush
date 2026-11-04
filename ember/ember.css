@@ -1,0 +1,128 @@
+/* Ember: a dark, warm room, one stick of incense, a beam of afternoon light. */
+:root {
+  --bg: #140d0b;
+  --ink: #f1e2cc;
+  --ink-soft: rgba(241, 226, 204, 0.74);
+  --ink-faint: rgba(241, 226, 204, 0.42);
+  --line: rgba(241, 226, 204, 0.16);
+  --chip-on: rgba(232, 162, 92, 0.16);
+  --accent: #f0b878;
+  --accent-2: #c8763f;
+  --accent-ink: #2a140b;
+  --glow: rgba(232, 140, 70, 0.4);
+}
+
+body {
+  background:
+    radial-gradient(90% 55% at 50% 100%, #3a2219 0%, rgba(58, 34, 25, 0) 70%),
+    linear-gradient(180deg, #1c1210 0%, #140d0b 60%, #100a09 100%);
+  background-color: #140d0b;
+}
+.vignette {
+  position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 55%, transparent 40%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+/* ───────── setup ───────── */
+.setup {
+  justify-content: space-between;
+  gap: 12px;
+}
+.intro { padding-top: 8px; }
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 420px;
+  min-height: 200px;
+  touch-action: none;
+  cursor: ns-resize;
+  border-radius: 24px;
+}
+.readout {
+  position: absolute;
+  left: calc(50% + 26px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  pointer-events: none;
+  transition: top 0.25s ease-out;
+}
+.stage.dragging .readout { transition: none; }
+.readout .num {
+  font: 300 clamp(48px, 15vw, 68px) / 0.9 var(--serif);
+  font-variant-numeric: lining-nums;
+  color: var(--ink);
+}
+.readout .unit {
+  margin-top: 4px;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.stage-hint {
+  position: absolute;
+  left: 0; right: calc(50% + 26px);
+  bottom: 30%;
+  margin: 0;
+  text-align: right;
+  font: italic 300 16px/1.3 var(--serif);
+  color: var(--ink-faint);
+  pointer-events: none;
+}
+.step {
+  position: absolute;
+  bottom: 6px;
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: rgba(241, 226, 204, 0.04);
+  font: 300 24px/1 var(--serif);
+  color: var(--ink-soft);
+}
+.step.minus { left: 8px; }
+.step.plus { right: 8px; }
+.step:active { transform: scale(0.92); }
+
+/* ───────── session ───────── */
+.session { justify-content: flex-start; }
+.session-top {
+  margin-top: max(9vh, calc(var(--safe-t) + 56px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.session .time {
+  font-size: clamp(60px, 19vw, 96px);
+  color: var(--ink);
+  text-shadow: 0 0 40px rgba(232, 140, 70, 0.25);
+}
+.session .time.long { font-size: clamp(46px, 14vw, 72px); }
+
+/* ───────── complete ───────── */
+.glyph {
+  width: 44px; height: 66px;
+  margin-bottom: 22px;
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  .setup {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
+    grid-template-areas: "stage intro" "stage options";
+    align-content: center;
+    column-gap: 32px;
+  }
+  .intro { grid-area: intro; align-self: end; }
+  .stage { grid-area: stage; height: 100%; }
+  .options { grid-area: options; align-self: start; }
+  .session-top { margin-top: calc(var(--safe-t) + 20px); }
+}

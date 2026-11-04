@@ -1,0 +1,106 @@
+/* Cairn: early morning at a still lake, linen light and leaf shadow. */
+:root {
+  --bg: #ece5d8;
+  --ink: #2f3b35;
+  --ink-soft: rgba(47, 59, 53, 0.78);
+  --ink-faint: rgba(47, 59, 53, 0.5);
+  --line: rgba(47, 59, 53, 0.18);
+  --chip-on: rgba(255, 255, 255, 0.55);
+  --accent: #8ea693;
+  --accent-2: #6b8573;
+  --accent-ink: #f8f4ec;
+  --glow: rgba(107, 133, 115, 0.45);
+}
+
+body {
+  background: linear-gradient(180deg, #f4efe6 0%, #ece5d8 55%, #dfe3dc 100%);
+  background-color: #ece5d8;
+}
+
+/* ───────── setup ───────── */
+.setup { justify-content: space-between; gap: 12px; }
+.intro { padding-top: 8px; }
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 420px;
+  min-height: 220px;
+  touch-action: none;
+  cursor: pointer;
+}
+.readout {
+  position: absolute;
+  top: 4px; left: 0; right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+.readout .num {
+  font: 300 clamp(46px, 14vw, 64px) / 0.95 var(--serif);
+  font-variant-numeric: lining-nums;
+}
+.readout .unit {
+  margin-top: 4px;
+  font-size: 11px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.stage-hint {
+  position: absolute;
+  bottom: 14px; left: 60px; right: 60px;
+  margin: 0;
+  text-align: center;
+  font: italic 300 15px/1.3 var(--serif);
+  color: var(--ink-faint);
+  pointer-events: none;
+}
+.step {
+  position: absolute;
+  bottom: 4px;
+  width: 46px; height: 42px;
+  border-radius: 52% 48% 46% 54% / 58% 56% 44% 42%;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.45);
+  font: 300 24px/1 var(--serif);
+  color: var(--ink-soft);
+}
+.step.minus { left: 6px; }
+.step.plus { right: 6px; }
+.step:active { transform: scale(0.92); }
+
+.sounds button { background: rgba(255, 255, 255, 0.25); }
+.ghost { border-color: var(--line); }
+
+/* ───────── session ───────── */
+.session { justify-content: flex-start; }
+.session-top {
+  margin-top: max(8vh, calc(var(--safe-t) + 52px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.session .time { font-size: clamp(58px, 18vw, 92px); color: var(--ink); }
+.session .time.long { font-size: clamp(44px, 13vw, 70px); }
+.ctrl svg { background: rgba(255, 255, 255, 0.5); }
+
+/* ───────── complete ───────── */
+.glyph { width: 56px; height: 56px; margin-bottom: 20px; fill: none; stroke: var(--ink-soft); stroke-width: 1.2; }
+.complete .eyebrow { letter-spacing: 0.3em; }
+
+@media (orientation: landscape) and (max-height: 540px) {
+  .setup {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
+    grid-template-areas: "stage intro" "stage options";
+    align-content: center;
+    column-gap: 32px;
+  }
+  .intro { grid-area: intro; align-self: end; }
+  .stage { grid-area: stage; height: 100%; }
+  .options { grid-area: options; align-self: start; }
+  .session-top { margin-top: calc(var(--safe-t) + 16px); }
+}

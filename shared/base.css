@@ -1,0 +1,323 @@
+/* Shared structure for all three designs. Themes set the tokens below. */
+:root {
+  --ink: #eadfcb;
+  --ink-soft: rgba(234, 223, 203, 0.72);
+  --ink-faint: rgba(234, 223, 203, 0.42);
+  --line: rgba(234, 223, 203, 0.18);
+  --chip-on: rgba(234, 223, 203, 0.14);
+  --accent: #eadfcb;
+  --accent-2: #b7a88f;
+  --accent-ink: #0b201f;
+  --glow: rgba(242, 197, 138, 0.28);
+  --bg: #0b201f;
+  --serif: 'Cormorant Garamond', 'Cormorant', Georgia, 'Times New Roman', serif;
+  --sans: 'Jost', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --fade: 1.4s;
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  font-family: var(--sans);
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+button:focus-visible, [tabindex]:focus-visible {
+  outline: 1.5px solid var(--ink-soft);
+  outline-offset: 4px;
+}
+
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+main {
+  position: fixed;
+  inset: 0;
+}
+
+/* ───────── screens ───────── */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--safe-t) + 20px) calc(var(--safe-r) + 16px) calc(var(--safe-b) + 20px) calc(var(--safe-l) + 16px);
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.985);
+  transition: opacity var(--fade) ease, transform var(--fade) ease, visibility 0s linear var(--fade);
+}
+main[data-state="setup"] .setup,
+main[data-state="session"] .session,
+main[data-state="complete"] .complete {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity var(--fade) ease 0.25s, transform var(--fade) ease 0.25s, visibility 0s;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  font: 400 11px/1 var(--sans);
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding-left: 0.42em; /* optically centre the tracking */
+}
+
+h1, h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 300;
+  text-wrap: balance;
+}
+h1 {
+  font-style: italic;
+  font-size: clamp(22px, 6.4vw, 30px);
+  line-height: 1.15;
+  color: var(--ink-soft);
+}
+
+.intro { text-align: center; }
+
+/* ───────── setup choices ───────── */
+.options {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 380px;
+}
+
+.sounds {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+.sounds button {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  transition: background 0.4s, border-color 0.4s, color 0.4s;
+}
+.sounds button[aria-checked="true"] {
+  background: var(--chip-on);
+  border-color: var(--ink-faint);
+  color: var(--ink);
+}
+.sounds button { font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; }
+
+.begin {
+  margin-top: 6px;
+  width: min(100%, 240px);
+  height: 56px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+  color: var(--accent-ink);
+  font: 500 13px/1 var(--sans);
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  padding-left: 0.34em;
+  box-shadow: 0 10px 40px -8px var(--glow), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: transform 0.25s ease, box-shadow 0.4s ease;
+}
+.begin:active { transform: scale(0.97); }
+
+.ghost {
+  margin-top: 28px;
+  height: 50px;
+  padding: 0 30px 0 calc(30px + 0.3em);
+  border-radius: 999px;
+  border: 1px solid var(--ink-faint);
+  font: 400 12.5px/1 var(--sans);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+.ghost:active { transform: scale(0.97); }
+
+/* ───────── session chrome ───────── */
+.hint {
+  position: absolute;
+  top: calc(var(--safe-t) + 24px);
+  left: 0; right: 0;
+  margin: 0;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  opacity: 0;
+  transition: opacity 1.6s ease;
+  pointer-events: none;
+}
+main.show-hint .hint { opacity: 1; }
+
+.breath {
+  margin: 0;
+  min-height: 1.4em;
+  font: italic 300 clamp(19px, 5.4vw, 24px) / 1.4 var(--serif);
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+.breath.show { opacity: 1; }
+
+.time {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+main.paused .time { animation: pausedPulse 3.2s ease-in-out infinite; }
+
+/* Opening breath: a large "breathe in" opens out across the screen over one inhale,
+   then gives way to the countdown, which appears as the first "breathe out" begins. */
+.session .time { transition: opacity 1.2s ease; }
+main.opening .session .time { opacity: 0; transition: none; }
+.opening-breath {
+  position: absolute;
+  left: 0; right: 0;
+  top: 50%;
+  margin: 0;
+  transform: translateY(-50%);
+  text-align: center;
+  white-space: nowrap;
+  font: italic 300 clamp(42px, 13vw, 104px) / 1 var(--serif);
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.9s ease, letter-spacing 0.9s ease;
+}
+main.inhaling .opening-breath {
+  opacity: 1;
+  letter-spacing: 0.22em;
+  transition: opacity 1.2s ease 0.3s, letter-spacing 4s cubic-bezier(0.3, 0, 0.3, 1);
+}
+@keyframes pausedPulse { 50% { opacity: 0.45; } }
+
+.controls {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: calc(var(--safe-b) + 28px);
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 28px;
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+main.show-controls .controls {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.ctrl {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 10.5px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.ctrl[hidden] { display: flex; visibility: hidden; }
+.ctrl svg {
+  width: 52px;
+  height: 52px;
+  padding: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--chip-on);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.ctrl.primary svg { width: 64px; height: 64px; padding: 19px; }
+.ctrl .i-play { fill: currentColor; stroke: none; padding-left: 21px; }
+.ctrl .i-play, main.paused .ctrl .i-pause { display: none; }
+main.paused .ctrl .i-play { display: block; }
+.ctrl .i-off, main.muted .ctrl .i-on { display: none; }
+main.muted .ctrl .i-off { display: block; }
+.ctrl:active svg { transform: scale(0.94); }
+
+/* ───────── complete ───────── */
+.complete { text-align: center; }
+.complete h2 { font-size: clamp(40px, 12vw, 56px); line-height: 1.05; margin-bottom: 14px; }
+.complete .rested { margin: 0; font: italic 300 21px/1.4 var(--serif); color: var(--ink-soft); }
+.complete .aftercare { margin: 18px auto 0; max-width: 28ch; font-size: 14px; line-height: 1.6; color: var(--ink-faint); }
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --fade: 0.5s; }
+  .opening-breath, main.inhaling .opening-breath { letter-spacing: 0.12em; transition: opacity 0.6s ease; }
+}
+
+/* ───────── back to the design picker ───────── */
+.back {
+  position: fixed;
+  top: calc(var(--safe-t) + 10px);
+  left: calc(var(--safe-l) + 10px);
+  width: 40px; height: 40px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  color: var(--ink-faint);
+  font: 300 20px/1 var(--serif);
+  text-decoration: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.8s ease;
+}
+body[data-phase="setup"] .back, body[data-phase="complete"] .back { opacity: 1; pointer-events: auto; }

@@ -1,0 +1,19 @@
+{
+  "name": "Hush",
+  "short_name": "Hush",
+  "description": "Hush — a room for rest. Three breath-led meditation timers.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b201f",
+  "theme_color": "#0b201f",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

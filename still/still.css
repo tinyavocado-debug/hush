@@ -1,0 +1,159 @@
+/* Still: a candlelit pool at night. */
+:root {
+  --bg: #0b201f;
+  --ink: #eadfcb;
+  --accent: #efe5d3;
+  --accent-2: #bfb096;
+  --accent-ink: #0d2523;
+  --glow: rgba(242, 197, 138, 0.3);
+  --dial: min(78vw, 42vh, 340px);
+}
+@supports (height: 1dvh) { :root { --dial: min(78vw, 42dvh, 340px); } }
+
+body {
+  background:
+    radial-gradient(120% 70% at 50% 115%, #2c4c42 0%, rgba(20, 51, 49, 0) 60%),
+    radial-gradient(90% 60% at 50% 40%, #153533 0%, #0b201f 75%);
+  background-color: #0b201f;
+}
+
+.dusk {
+  position: fixed; inset: 0; pointer-events: none;
+  background: #040e0e;
+  opacity: 0;
+  transition: opacity 4s ease;
+}
+body[data-phase="session"] .dusk { opacity: 0.38; }
+.vignette {
+  position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.5) 100%);
+}
+
+.setup { gap: clamp(14px, 3vh, 28px); }
+
+/* ───────── dial ───────── */
+.dial-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.dial {
+  position: relative;
+  width: var(--dial);
+  height: var(--dial);
+  touch-action: none;
+  cursor: grab;
+  border-radius: 50%;
+}
+.dial.dragging { cursor: grabbing; }
+.dial svg { width: 100%; height: 100%; overflow: visible; }
+.dial .track { fill: rgba(234, 223, 203, 0.03); stroke: rgba(234, 223, 203, 0.12); stroke-width: 1.5; }
+/* One ring per completed hour. A new ring peels off the arc and settles inward. */
+.dial .lap {
+  fill: none;
+  stroke: rgba(234, 223, 203, 0.45);
+  stroke-width: 1.5;
+  opacity: 0;
+  transform: scale(var(--from, 1));
+  transform-origin: 150px 150px;
+  transition: opacity 0.45s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.dial .lap.on { opacity: 1; transform: none; }
+.dial .arc {
+  fill: none;
+  stroke: #efe5d3;
+  stroke-width: 3;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px rgba(242, 197, 138, 0.55));
+  transition: stroke-dashoffset 0.18s ease-out;
+}
+.dial .tick { fill: rgba(234, 223, 203, 0.35); }
+.dial .tick.major { fill: rgba(234, 223, 203, 0.6); }
+#dialKnob { transition: transform 0.18s ease-out; }
+.dial.dragging .arc, .dial.dragging #dialKnob { transition: none; }
+
+.readout {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.readout .num {
+  font: 300 calc(var(--dial) * 0.3) / 0.9 var(--serif);
+  font-variant-numeric: lining-nums;
+  color: var(--ink);
+}
+.readout .unit {
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.pebble-btn {
+  position: absolute;
+  bottom: 0;
+  width: 48px; height: 44px;
+  border-radius: 52% 48% 46% 54% / 58% 56% 44% 42%;
+  background: radial-gradient(circle at 36% 30%, rgba(246, 239, 228, 0.22), rgba(183, 168, 143, 0.08) 70%);
+  border: 1px solid var(--line);
+  font: 300 26px/1 var(--serif);
+  color: var(--ink-soft);
+}
+.pebble-btn.minus { left: -2px; }
+.pebble-btn.plus { right: -2px; }
+.pebble-btn:active { transform: scale(0.92); }
+
+.dial-hint {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* ───────── session ───────── */
+.orb-wrap {
+  --orb: min(76vw, 50vh, 380px);
+  position: relative;
+  width: var(--orb);
+  height: var(--orb);
+  display: grid;
+  place-items: center;
+}
+.orb {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 38% 30%, rgba(255, 247, 230, 0.28), rgba(255, 247, 230, 0) 42%),
+    radial-gradient(circle, rgba(143, 174, 159, 0.22) 0%, rgba(47, 90, 82, 0.12) 55%, rgba(18, 48, 46, 0) 72%);
+  box-shadow: 0 0 120px rgba(242, 197, 138, 0.12), inset 0 0 60px rgba(234, 223, 203, 0.06);
+  will-change: transform;
+}
+.ring { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ring-track { fill: none; stroke: rgba(234, 223, 203, 0.08); stroke-width: 0.5; }
+.ring-fill { fill: none; stroke: rgba(234, 223, 203, 0.6); stroke-width: 0.6; stroke-linecap: round; }
+.time { position: relative; font-size: calc(var(--orb) * 0.22); color: var(--ink); }
+.time.long { font-size: calc(var(--orb) * 0.16); }
+.session .breath { margin-top: 28px; }
+
+/* ───────── complete ───────── */
+.glyph { width: 72px; height: 72px; margin-bottom: 22px; fill: none; stroke: var(--ink); stroke-width: 1; }
+.glyph circle:first-child { fill: var(--ink); stroke: none; }
+
+/* ───────── landscape phones ───────── */
+@media (orientation: landscape) and (max-height: 540px) {
+  :root { --dial: min(70vh, 300px); }
+  .setup {
+    display: grid;
+    grid-template-columns: auto minmax(0, 340px);
+    grid-template-areas: "dial intro" "dial options";
+    align-content: center;
+    justify-content: center;
+    column-gap: 40px;
+    row-gap: 14px;
+  }
+  .intro { grid-area: intro; align-self: end; }
+  .dial-wrap { grid-area: dial; }
+  .dial-hint { display: none; }
+  .options { grid-area: options; align-self: start; }
+  .orb-wrap { --orb: min(60vh, 300px); }
+  .session .breath { margin-top: 10px; }
+}
