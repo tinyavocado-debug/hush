@@ -5,9 +5,9 @@
       <stop offset="1" stop-color="#0b201f"/>
     </radialGradient>
     <radialGradient id="stone" cx="38%" cy="30%" r="80%">
-      <stop offset="0" stop-color="#f6efe4"/>
-      <stop offset=".55" stop-color="#cbbda6"/>
-      <stop offset="1" stop-color="#7f735f"/>
+      <stop offset="0" stop-color="#c1bdb6"/>
+      <stop offset=".55" stop-color="#a49e93"/>
+      <stop offset="1" stop-color="#6b6760"/>
     </radialGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
