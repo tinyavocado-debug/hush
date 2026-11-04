@@ -185,7 +185,15 @@
     const emit = (type, data) => { try { A.onEvent?.(type, data); } catch { /* ignore */ } };
 
     // Shape a parameter to follow one breath: rise over the inhale, settle over the exhale.
+    // A param's value right now, following any curve we scheduled on it.
+    const now = (param) => { const curve = curves.get(param); return curve ? curve(ctx.currentTime) : param.value; };
+
+    // How far each sound swells toward its in-breath peak. 1 is the full swing set in each bed;
+    // lower softens the top of every breath in every room.
+    const BREATH_DEPTH = 0.65;
+
     function breathShape(param, p, hi, lo, tau = 3) {
+      hi = lo + (hi - lo) * BREATH_DEPTH;
       const t = ctx.currentTime;
       const up = Math.max(0, (INHALE - p) / 1000);
       const down = p < INHALE ? EXHALE / 1000 : (CYCLE - p) / 1000;
@@ -225,9 +233,15 @@
         };
       },
       rain(c) {
-        src(c, buf('white')).connect(filt('highpass', 900)).connect(filt('lowpass', 7000)).connect(gain(0.15)).connect(c.bed);
+        // Each in-breath brings a gust: the hiss brightens and swells and the drops quicken.
+        const hissTone = filt('lowpass', 5000), hiss = gain(0.12);
+        src(c, buf('white')).connect(filt('highpass', 900)).connect(hissTone).connect(hiss).connect(c.bed);
         src(c, buf('brown'), 1.1).connect(filt('lowpass', 500)).connect(gain(0.45)).connect(c.bed);
-        chain(c, () => 90 + Math.random() * Math.random() * 900, () => {
+        c.breathe = (p) => {
+          breathShape(hissTone.frequency, p, 8000, 3200, 3);
+          breathShape(hiss.gain, p, 0.22, 0.09, 3);
+        };
+        chain(c, () => (90 + Math.random() * Math.random() * 900) / (0.5 + 4 * now(hiss.gain)), () => {
           const t = ctx.currentTime + 0.01, f = 900 + Math.random() * 2600;
           const peak = 0.008 + Math.random() * Math.random() * 0.05, pan = Math.random() * 2 - 1;
           const o = ctx.createOscillator(), g = ctx.createGain(), p = panner(pan * 0.8);
@@ -253,11 +267,17 @@
         c.breathe = (p) => breathShape(tone.frequency, p, 1500, 650, 3);
       },
       hearth(c) {
-        src(c, buf('brown'), 0.8).connect(filt('lowpass', 260)).connect(gain(0.6)).connect(c.bed);
+        // Breathes like bellows: roar and rumble rise on the in-breath, and the crackles with them.
+        const rumble = filt('lowpass', 260);
+        src(c, buf('brown'), 0.8).connect(rumble).connect(gain(0.6)).connect(c.bed);
         const roar = gain(0.05);
         src(c, buf('white')).connect(filt('bandpass', 900, 0.5)).connect(roar).connect(c.bed);
         lfo(c, 0.13, 0.03, roar.gain);
-        chain(c, () => 25 + Math.random() ** 2 * 520, () => {
+        c.breathe = (p) => {
+          breathShape(roar.gain, p, 0.11, 0.035, 3);
+          breathShape(rumble.frequency, p, 560, 240, 3);
+        };
+        chain(c, () => (25 + Math.random() ** 2 * 520) / (0.5 + 10 * now(roar.gain)), () => {
           const t = ctx.currentTime + 0.005, s = ctx.createBufferSource();
           const big = Math.random() < 0.06, peak = big ? 0.3 + Math.random() * 0.2 : 0.02 + Math.random() ** 3 * 0.18;
           s.buffer = buf('click'); s.playbackRate.value = 0.6 + Math.random() * 1.2;
@@ -268,15 +288,19 @@
         });
       },
       garden(c) {
+        // A breeze through the leaves on each in-breath; the chimes ring more while it blows.
+        const breeze = gain(1);
+        breeze.connect(c.bed);
+        c.breathe = (p) => breathShape(breeze.gain, p, 1.7, 0.6, 3);
         src(c, buf('brown'), 1.2).connect(filt('lowpass', 400)).connect(gain(0.22)).connect(c.bed);
         [[700, 1.2, 0.07, 250, 0.31], [1700, 0.9, 0.05, 500, 0.53], [3200, 0.7, 0.022, 900, 0.71]].forEach(([f, q, a, dep, rate]) => {
           const b = filt('bandpass', f, q);
-          src(c, buf('white')).connect(b).connect(gain(a)).connect(c.bed);
+          src(c, buf('white')).connect(b).connect(gain(a)).connect(breeze);
           lfo(c, rate, dep, b.frequency);
           lfo(c, rate * 1.7, dep * 0.6, b.frequency);
         });
         const notes = [523.25, 587.33, 659.25, 783.99, 880, 1046.5];
-        chain(c, () => 2500 + Math.random() * 7000, () => {
+        chain(c, () => (2500 + Math.random() * 7000) / now(breeze.gain), () => {
           const n = Math.random() < 0.35 ? 2 + Math.floor(Math.random() * 2) : 1;
           for (let i = 0; i < n; i++) chime(c.bed, i * (0.18 + Math.random() * 0.3), notes[Math.floor(Math.random() * notes.length)]);
         });
