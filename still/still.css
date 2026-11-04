@@ -153,7 +153,6 @@ body[data-phase="session"] .dusk { opacity: 0.38; }
 .time { position: relative; font-size: calc(var(--orb) * 0.22); color: var(--ink); text-shadow: 0 1px 14px rgba(0, 0, 0, 0.4); }
 .time.long { font-size: calc(var(--orb) * 0.16); }
 .session .breath { margin-top: 28px; }
-
 /* ───────── complete ───────── */
 .glyph { width: 72px; height: 72px; margin-bottom: 22px; fill: none; stroke: var(--ink); stroke-width: 1; }
 .glyph circle:first-child { fill: var(--ink); stroke: none; }

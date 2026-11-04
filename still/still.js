@@ -295,8 +295,9 @@
       const px = Math.round(cv.clientWidth * Math.min(2, devicePixelRatio || 1));
       if (px !== size) { size = cv.width = cv.height = px; gl.viewport(0, 0, px, px); }
       // Focus: sharp at the turn of each breath, softest midway through it.
-      const f = b.inhale ? b.p / Spa.INHALE : (b.p - Spa.INHALE) / Spa.EXHALE;
-      const blur = Math.pow(Math.sin(Math.PI * clamp(f, 0, 1)), 0.7);
+      // Holds stay in focus.
+      const moving = b.stage === 'in' || b.stage === 'out', f = b.f;
+      const blur = moving ? Math.pow(Math.sin(Math.PI * clamp(f, 0, 1)), 0.7) : 0;
       // A slow turn about a tilted axis.
       const ay = t * 0.12, ax = 0.4;
       const cy = Math.cos(ay), sy = Math.sin(ay), cx = Math.cos(ax), sx = Math.sin(ax);
@@ -308,8 +309,8 @@
       gl.uniform1f(u.uBlur, blur);
       // The pattern shows around the turn from out-breath to in-breath, a new figure each breath.
       // Not while the session opens (the settle and the opening inhale, cycles -1 and 0):
-      // the first one comes at the end of the first out-breath.
-      const near = b.inhale ? 1 - Spa.ease(f / 0.4) : Spa.ease((f - 0.6) / 0.4);
+      // the first one comes at the end of the first out-breath. It stays through a hold after the out-breath.
+      const near = { in: 1 - Spa.ease(f / 0.4), 'hold-in': 0, out: Spa.ease((f - 0.6) / 0.4), 'hold-out': 1 }[b.stage];
       const opened = b.inhale ? b.cycle >= 1 : b.cycle >= 0;
       gl.uniform1f(u.uPat, opened ? near : 0);
       gl.uniform1f(u.uKind, ((b.inhale ? b.cycle : b.cycle + 1) + 2) % 3); // rings first, then spiral, meridians

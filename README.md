@@ -14,7 +14,9 @@ Hush is a breath-led meditation timer for your phone. Choose a room, set how lon
 
 ## A session
 
-A singing bowl, a moment of stillness, then one large "breathe in". The countdown begins on your first breath out. Breathing is paced at four seconds in and six out, with the visuals and soundscape rising and settling on each breath. Three bells close the session, followed by a gentle note for coming back.
+A singing bowl, a moment of stillness, then one large "breathe in". The countdown begins on your first breath out. The visuals and soundscape rise and settle on each breath.
+
+Every session starts at a **Steady** pace (4 seconds in, 6 out). Tap during a session to change it: **Short** (3 in, 5 out) or **Long** (5 in, 8 out), and **Hold** to pause after each breath in and each breath out (2, 3 or 4 seconds, matching the pace). The new rhythm starts with your next breath. Three bells close the session, followed by a gentle note for coming back.
 
 All sound is generated live in the browser with the Web Audio API, with no audio files. The screen stays awake during a session.
 
