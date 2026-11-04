@@ -151,6 +151,49 @@ h1 {
 }
 .sounds button { font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; }
 
+/* Breath pace and hold during a session: a row near the top of the screen, shown with the controls. */
+.session-breath {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--safe-t) + 40px);
+  display: flex;
+  gap: 6px;
+  width: min(340px, calc(100% - 32px));
+  transform: translate(-50%, -10px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+main.show-controls .session-breath { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+main.show-controls .hint { opacity: 0; } /* the tap hint shares the top of the screen */
+.paces { display: flex; flex: 3 1 0; min-width: 0; border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
+.paces button, .hold-toggle {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 32px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  transition: background 0.4s, border-color 0.4s, color 0.4s;
+}
+.hold-toggle { height: 38px; border: 1px solid var(--line); }
+.paces, .hold-toggle { -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); background-color: var(--chip-on); }
+.paces button[aria-checked="true"], .hold-toggle[aria-pressed="true"] { background: var(--chip-on); color: var(--ink); }
+.hold-toggle[aria-pressed="true"] { border-color: var(--ink-faint); }
+/* Rooms with the clock at the top (Ember, Cairn) ease it down to make room while the choices show. */
+.session-top { transition: transform 0.6s ease; }
+main.show-controls .session-top { transform: translateY(36px); }
+/* Landscape phones: no room at the top, so stack the choices along the left edge. */
+@media (orientation: landscape) and (max-height: 540px) {
+  .session-breath { left: calc(var(--safe-l) + 24px); top: 50%; flex-direction: column; width: 116px; transform: translate(-10px, -50%); }
+  main.show-controls .session-breath { transform: translate(0, -50%); }
+  .paces { flex-direction: column; border-radius: 20px; }
+  .paces button, .hold-toggle { flex: none; }
+  main.show-controls .session-top { transform: none; }
+}
+
 .begin {
   margin-top: 6px;
   width: min(100%, 240px);
@@ -238,7 +281,7 @@ main.opening .session .time { opacity: 0; transition: none; }
 main.inhaling .opening-breath {
   opacity: 1;
   letter-spacing: 0.22em;
-  transition: opacity 1.2s ease 0.3s, letter-spacing 4s cubic-bezier(0.3, 0, 0.3, 1);
+  transition: opacity 1.2s ease 0.3s, letter-spacing var(--inhale, 4s) cubic-bezier(0.3, 0, 0.3, 1);
 }
 @keyframes pausedPulse { 50% { opacity: 0.45; } }
 

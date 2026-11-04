@@ -9,15 +9,31 @@
   Spa.ease = (t) => 0.5 - 0.5 * Math.cos(Math.PI * clamp(t, 0, 1));
   Spa.reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  const INHALE = (Spa.INHALE = 4000);
-  const EXHALE = (Spa.EXHALE = 6000);
-  const CYCLE = (Spa.CYCLE = INHALE + EXHALE);
-  const GUIDE_CYCLES = 6; // breathing words fade away after the first minute
+  // Breath pattern: a pace sets how long each breath in and out lasts, and an optional hold
+  // pauses after each (in, hold, out, hold). Changed from the session controls.
+  Spa.PACES = {
+    short: { label: 'Short', inhale: 3000, exhale: 5000, hold: 2000 },
+    steady: { label: 'Steady', inhale: 4000, exhale: 6000, hold: 3000 },
+    long: { label: 'Long', inhale: 5000, exhale: 8000, hold: 4000 },
+  };
+  Spa.setPattern = (pace, hold) => {
+    if (!Spa.PACES[pace]) pace = 'steady';
+    hold = !!hold;
+    const P = Spa.PACES[pace], h = hold ? P.hold : 0;
+    Spa.pattern = Object.freeze({
+      pace, hold, inhale: P.inhale, holdIn: h, exhale: P.exhale, holdOut: h,
+      cycle: P.inhale + h + P.exhale + h,
+    });
+    return Spa.pattern;
+  };
+  Spa.setPattern('steady', false);
+
+  const GUIDE_CYCLES = 6; // breathing words fade away after the first few breaths
   // Every session opens with a brief stillness, then one breath in shown large across the
-  // screen. The countdown starts when that inhale ends, on the first "breathe out".
+  // screen. The countdown starts when that inhale (and its hold) ends, on the first "breathe out".
   const SETTLE = (Spa.SETTLE = 1500);
-  const OPENING = (Spa.OPENING = SETTLE + INHALE);
-  const AT_REST = Object.freeze({ cycle: -1, p: 0, inhale: true, k: 0 });
+  const AT_REST = Object.freeze({ cycle: -1, p: 0, stage: 'in', f: 0, inhale: true, k: 0 });
+  const STAGE_WORDS = { in: 'breathe in', 'hold-in': 'hold', out: 'breathe out', 'hold-out': 'hold' };
 
   Spa.AFTERCARE = [
     'Take a slow sip of water before you rise.',
@@ -52,10 +68,18 @@
     const h = Math.floor(min / 60), m = min % 60;
     return `${h} hour${h > 1 ? 's' : ''}${m ? ` ${m} minutes` : ''}`;
   };
-  Spa.breathAt = (elapsed) => {
-    const cycle = Math.floor(elapsed / CYCLE), p = elapsed % CYCLE, inhale = p < INHALE;
-    const k = inhale ? Spa.ease(p / INHALE) : 1 - Spa.ease((p - INHALE) / EXHALE);
-    return { cycle, p, inhale, k };
+  // Where a breath stands after `elapsed` ms: its cycle, position p within it, the stage
+  // ('in', 'hold-in', 'out', 'hold-out'), progress f through that stage, and fullness k (0..1).
+  // `inhale` is true from the start of the breath in until the breath out begins.
+  Spa.breathAt = (elapsed, P = Spa.pattern) => {
+    const cycle = Math.floor(elapsed / P.cycle), p = elapsed % P.cycle;
+    const full = P.inhale + P.holdIn, empty = full + P.exhale;
+    let stage, f, k;
+    if (p < P.inhale) { stage = 'in'; f = p / P.inhale; k = Spa.ease(f); }
+    else if (p < full) { stage = 'hold-in'; f = (p - P.inhale) / P.holdIn; k = 1; }
+    else if (p < empty) { stage = 'out'; f = (p - full) / P.exhale; k = 1 - Spa.ease(f); }
+    else { stage = 'hold-out'; f = (p - empty) / P.holdOut; k = 0; }
+    return { cycle, p, stage, f, inhale: p < full, k };
   };
 
   /* ───────────── wake lock ───────────── */
@@ -184,7 +208,6 @@
     }
     const emit = (type, data) => { try { A.onEvent?.(type, data); } catch { /* ignore */ } };
 
-    // Shape a parameter to follow one breath: rise over the inhale, settle over the exhale.
     // A param's value right now, following any curve we scheduled on it.
     const now = (param) => { const curve = curves.get(param); return curve ? curve(ctx.currentTime) : param.value; };
 
@@ -192,17 +215,21 @@
     // lower softens the top of every breath in every room.
     const BREATH_DEPTH = 0.65;
 
+    // Shape a parameter to follow one breath from position p: rise over the inhale, stay up
+    // through any hold, then settle over the exhale (and rest there through the hold after it).
     function breathShape(param, p, hi, lo, tau = 3) {
       hi = lo + (hi - lo) * BREATH_DEPTH;
+      const P = breathPattern, full = P.inhale + P.holdIn, empty = full + P.exhale;
       const t = ctx.currentTime;
-      const up = Math.max(0, (INHALE - p) / 1000);
-      const down = p < INHALE ? EXHALE / 1000 : (CYCLE - p) / 1000;
-      const v0 = hold(param, t), tc = Math.max(0.1, down / tau), peak = up > 0 ? hi : v0;
+      const up = Math.max(0, (P.inhale - p) / 1000);          // seconds of rise left
+      const top = Math.max(0, (full - Math.max(p, P.inhale)) / 1000); // then seconds held at the top
+      const down = Math.max(0.5, (empty - Math.max(p, full)) / 1000); // then seconds to settle
+      const v0 = hold(param, t), tc = Math.max(0.1, down / tau), peak = up > 0 ? hi : v0, fall = t + up + top;
       if (up > 0) param.linearRampToValueAtTime(hi, t + up);
-      param.setTargetAtTime(lo, t + up, tc);
+      param.setTargetAtTime(lo, fall, tc);
       curves.set(param, (x) => (x < t + up
         ? v0 + (hi - v0) * Math.max(0, x - t) / up
-        : lo + (peak - lo) * Math.exp(-(x - t - up) / tc)));
+        : x < fall ? peak : lo + (peak - lo) * Math.exp(-(x - fall) / tc)));
     }
 
     function chime(dest, delay, f) {
@@ -331,7 +358,8 @@
         try { c.bed.disconnect(); } catch { /* ignore */ }
       }, fade * 1000 + 250);
     };
-    A.breathe = (p) => { if (ctx && cur?.breathe && !A.dimmed) cur.breathe(p); };
+    let breathPattern = Spa.pattern; // the pattern of the breath being shaped
+    A.breathe = (p, P = Spa.pattern) => { breathPattern = P; if (ctx && cur?.breathe && !A.dimmed) cur.breathe(p); };
     A.dim = (on) => { A.dimmed = on; if (ctx) to(ambienceGain.gain, on ? 0.2 : 1, 1.5); };
     A.mute = (on) => { if (ctx) to(muteGain.gain, on ? 0 : 1, 0.6); };
 
@@ -421,6 +449,48 @@
     openingEl.className = 'opening-breath';
     openingEl.textContent = 'breathe in';
     $('.session').appendChild(openingEl);
+
+    // Breath pace and hold. Every session starts Steady with no hold; both can be changed
+    // from the session controls, and a change starts with the next breath.
+    const breathOpts = document.createElement('div');
+    breathOpts.className = 'session-breath';
+    breathOpts.innerHTML = `
+      <div class="paces" role="radiogroup" aria-label="Breath pace">
+        ${Object.entries(Spa.PACES).map(([k, v]) => `<button type="button" role="radio" data-pace="${k}">${v.label}</button>`).join('')}
+      </div>
+      <button type="button" class="hold-toggle" aria-pressed="false">Hold</button>`;
+    $('.session .controls').before(breathOpts);
+    breathOpts.querySelectorAll('[data-pace]').forEach((b) =>
+      b.addEventListener('click', () => setBreath(b.dataset.pace, Spa.pattern.hold)));
+    breathOpts.querySelector('.hold-toggle').addEventListener('click', () => setBreath(Spa.pattern.pace, !Spa.pattern.hold));
+    function renderBreath() {
+      const P = Spa.pattern;
+      breathOpts.querySelectorAll('[data-pace]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.pace === P.pace)));
+      breathOpts.querySelector('.hold-toggle').setAttribute('aria-pressed', String(P.hold));
+    }
+    function setBreath(pace, hold) {
+      Spa.setPattern(pace, hold);
+      renderBreath();
+      st.bChange = Math.floor(Math.max(0, st.bLocal) / st.bPat.cycle); // switch once this breath ends
+    }
+
+    // The session's breath clock. It runs on the pattern it began with until a new one is
+    // chosen; then, as the current breath ends, it picks up the new pattern from there.
+    function sessionBreath(e) {
+      let local = e - st.bOrigin;
+      const c = Math.floor(local / st.bPat.cycle);
+      if (st.bPat !== Spa.pattern && c > st.bChange) {
+        st.bOrigin += c * st.bPat.cycle;
+        st.bOffset += c;
+        st.bPat = Spa.pattern;
+        st.guideUntil = st.bOffset + 3; // show the words again for a few breaths at the new pace
+        local = e - st.bOrigin;
+      }
+      st.bLocal = local;
+      const b = Spa.breathAt(local, st.bPat);
+      b.cycle += st.bOffset;
+      return b;
+    }
     const ringC = el.ring ? 2 * Math.PI * Number(el.ring.getAttribute('r')) : 0;
     if (el.ring) el.ring.style.strokeDasharray = `${ringC}`;
 
@@ -460,9 +530,15 @@
 
     function begin() {
       audio.ensure();
-      // The session runs the settle, the opening inhale and the timer; st.remaining counts down the whole span.
+      // The session runs the settle, the opening inhale (and its hold) and the timer;
+      // st.remaining counts down the whole span.
       st.total = st.minutes * 60000;
-      st.span = st.total + OPENING;
+      Spa.setPattern('steady', false);
+      renderBreath();
+      st.span = st.total + SETTLE + Spa.pattern.inhale + Spa.pattern.holdIn;
+      st.bPat = Spa.pattern; st.bOrigin = 0; st.bOffset = 0; st.bChange = -1; st.bLocal = 0;
+      st.guideUntil = GUIDE_CYCLES;
+      main.style.setProperty('--inhale', `${Spa.pattern.inhale / 1000}s`);
       st.remaining = st.span;
       st.endAt = Date.now() + st.span;
       st.opening = true;
@@ -540,7 +616,7 @@
       main.classList.toggle('muted', st.muted);
     });
     $('.session').addEventListener('click', (e) => {
-      if (e.target.closest('button')) { showControls(st.paused); return; }
+      if (e.target.closest('button, .session-breath')) { showControls(st.paused); return; }
       if (main.classList.contains('show-controls') && !st.paused) main.classList.remove('show-controls');
       else showControls();
     });
@@ -587,7 +663,7 @@
         if (inhaling !== st.inhaling) { st.inhaling = inhaling; main.classList.toggle('inhaling', inhaling); }
         const left = Math.min(st.total, st.remaining); // the countdown holds at full time until the opening breath ends
         const elapsed = st.total - left;
-        const breath = settling ? AT_REST : Spa.breathAt(into - SETTLE); // one clock from the opening inhale onwards
+        const breath = settling ? AT_REST : sessionBreath(into - SETTLE); // one clock from the opening inhale onwards
         const secs = Math.ceil(left / 1000);
         if (secs !== st.lastSecs) {
           st.lastSecs = secs;
@@ -600,12 +676,12 @@
         if (el.ring) el.ring.style.strokeDashoffset = `${ringC * (elapsed / st.total)}`;
         if (!st.paused && !settling && breath.cycle !== st.lastCycle) {
           st.lastCycle = breath.cycle;
-          audio.breathe(breath.p);
+          audio.breathe(breath.p, st.bPat);
           cfg.onBreath?.(breath);
         }
         // During the opening breath the large "breathe in" speaks instead of the small label.
-        const label = st.paused ? 'paused' : opening ? '' : breath.inhale ? 'breathe in' : 'breathe out';
-        setLabel(label, st.paused || (!opening && breath.cycle < GUIDE_CYCLES));
+        const label = st.paused ? 'paused' : opening ? '' : STAGE_WORDS[breath.stage];
+        setLabel(label, st.paused || (!opening && breath.cycle < st.guideUntil));
         info = { phase: 'session', minutes: st.minutes, total: st.total, remaining: left, elapsed, progress: elapsed / st.total, paused: st.paused, opening, breath };
         if (st.remaining <= 0 && !st.paused) complete(false);
       } else {
