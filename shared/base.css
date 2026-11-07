@@ -182,7 +182,7 @@ main.show-controls .hint { opacity: 0; } /* the tap hint shares the top of the s
 .paces, .hold-toggle { -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); background-color: var(--chip-on); }
 .paces button[aria-checked="true"], .hold-toggle[aria-pressed="true"] { background: var(--chip-on); color: var(--ink); }
 .hold-toggle[aria-pressed="true"] { border-color: var(--ink-faint); }
-/* Rooms with the clock at the top (Ember, Cairn) ease it down to make room while the choices show. */
+/* Rooms with the clock at the top (Ember, Pond) ease it down to make room while the choices show. */
 .session-top { transition: transform 0.6s ease; }
 main.show-controls .session-top { transform: translateY(36px); }
 /* Landscape phones: no room at the top, so stack the choices along the left edge. */

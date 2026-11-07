@@ -10,7 +10,7 @@ Hush is a breath-led meditation timer for your phone. Choose a room, set how lon
 
 - **Still**: a candlelit pool at night. Turn the stone around the dial; each full hour adds a ring. Ocean, rain or silence.
 - **Ember**: a single stick of incense that burns down as you rest. Drag it to its length. Drone, hearth or silence.
-- **Cairn**: a koi pond seen from above. Lily pads drift, the fish circle, and each breath sends a ring across the water. Rain rings the surface; a garden chime drops a petal. Garden, rain or silence.
+- **Pond**: a koi pond seen from above. Lily pads drift, the fish circle, and each breath sends a ring across the water. Rain rings the surface; a garden chime drops a petal. Garden, rain or silence.
 
 ## A session
 
@@ -35,6 +35,6 @@ python3 -m http.server 8000
 index.html            room picker
 shared/core.js        session engine: timing, breathing clock, generative audio, wake lock
 shared/base.css       shared layout and controls
-still/ ember/ cairn/  one folder per room (page, styles, scene)
+still/ ember/ pond/   one folder per room (page, styles, scene)
 manifest.webmanifest  home-screen install
 ```

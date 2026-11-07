@@ -117,7 +117,7 @@ body[data-phase="session"] .dusk { opacity: 0.38; }
   display: grid;
   place-items: center;
 }
-/* A soft-focus sphere in Cairn's stone tones. Its edge blurs in and out with the
+/* A soft-focus sphere in stone tones. Its edge blurs in and out with the
    breath (--k: 0 fully out, 1 fully in), and a film grain sits on top, unblurred. */
 .orb, .orb-grain {
   position: absolute;

@@ -1,4 +1,4 @@
-/* Cairn: a koi pond seen from above. It breathes on the shared clock: a ring spreads from the
+/* Pond: a koi pond seen from above. It breathes on the shared clock: a ring spreads from the
    centre as each breath in starts, rain drops ring the water, and a garden chime drops a petal. */
 (function () {
   'use strict';
@@ -245,7 +245,8 @@
   $('#plus').addEventListener('click', () => { Spa.audio.ensure(); app.setMinutes(app.minutes + 5, true); });
 
   const app = Spa.createApp({
-    key: 'cairn', title: 'Cairn · Hush', short: 'Cairn',
+    // Stored under the room's old name, Cairn, so a saved length carries over.
+    key: 'cairn', title: 'Pond · Hush', short: 'Pond',
     min: 5, max: 90, defaultMinutes: 30, defaultSound: 'garden',
     sounds: ['garden', 'rain', 'silence'],
     bell: { f0: 261.6, vol: 0.42 },
