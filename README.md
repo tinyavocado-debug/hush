@@ -10,7 +10,7 @@ Hush is a breath-led meditation timer for your phone. Choose a room, set how lon
 
 - **Still**: a candlelit pool at night. Turn the stone around the dial; each full hour adds a ring. Ocean, rain or silence.
 - **Ember**: a single stick of incense that burns down as you rest. Drag it to its length. Drone, hearth or silence.
-- **Cairn**: morning at a still lake. Stack a stone for every five minutes and watch them return to light. Garden, rain or silence.
+- **Cairn**: a koi pond seen from above. Lily pads drift, the fish circle, and each breath sends a ring across the water. Rain rings the surface; a garden chime drops a petal. Garden, rain or silence.
 
 ## A session
 

@@ -1,53 +1,43 @@
-/* Cairn: early morning at a still lake, linen light and leaf shadow. */
+/* Cairn: a koi pond seen from above, lily pads and lotus on dark green water. */
 :root {
-  --bg: #ece5d8;
-  --ink: #2f3b35;
-  --ink-soft: rgba(47, 59, 53, 0.78);
-  --ink-faint: rgba(47, 59, 53, 0.5);
-  --line: rgba(47, 59, 53, 0.18);
-  --chip-on: rgba(255, 255, 255, 0.55);
-  --accent: #8ea693;
-  --accent-2: #6b8573;
-  --accent-ink: #f8f4ec;
-  --glow: rgba(107, 133, 115, 0.45);
+  --bg: #0f2a27;
+  --ink: #e8efe4;
+  --ink-soft: rgba(232, 239, 228, 0.8);
+  --ink-faint: rgba(232, 239, 228, 0.52);
+  --line: rgba(232, 239, 228, 0.2);
+  --chip-on: rgba(232, 239, 228, 0.14);
+  --accent: #e8efe4;
+  --accent-2: #b9c8b2;
+  --accent-ink: #10302b;
+  --glow: rgba(180, 220, 190, 0.25);
 }
-
 body {
-  background: linear-gradient(180deg, #f4efe6 0%, #ece5d8 55%, #dfe3dc 100%);
-  background-color: #ece5d8;
+  background: radial-gradient(90% 70% at 50% 45%, #1d4a42 0%, #0a1f1d 85%);
+  background-color: #0f2a27;
 }
 
 /* ───────── setup ───────── */
-.setup { justify-content: space-between; gap: 12px; }
-.intro { padding-top: 8px; }
+.setup { justify-content: space-between; gap: 12px; padding-top: calc(var(--safe-t) + 36px); }
 .stage {
   position: relative;
   flex: 1 1 auto;
   width: 100%;
   max-width: 420px;
-  min-height: 220px;
+  min-height: 200px;
   touch-action: none;
   cursor: pointer;
 }
 .readout {
   position: absolute;
-  top: 4px; left: 0; right: 0;
+  top: 50%; left: 0; right: 0;
+  transform: translateY(-60%);
   display: flex;
   flex-direction: column;
   align-items: center;
   pointer-events: none;
 }
-.readout .num {
-  font: 300 clamp(46px, 14vw, 64px) / 0.95 var(--serif);
-  font-variant-numeric: lining-nums;
-}
-.readout .unit {
-  margin-top: 4px;
-  font-size: 11px;
-  letter-spacing: 0.26em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-}
+.readout .num { font: 300 clamp(56px, 17vw, 84px) / 0.95 var(--serif); font-variant-numeric: lining-nums; }
+.readout .unit { margin-top: 4px; font-size: 11px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-faint); }
 .stage-hint {
   position: absolute;
   bottom: 14px; left: 60px; right: 60px;
@@ -60,36 +50,36 @@ body {
 .step {
   position: absolute;
   bottom: 4px;
-  width: 46px; height: 42px;
-  border-radius: 52% 48% 46% 54% / 58% 56% 44% 42%;
+  width: 44px; height: 44px;
+  border-radius: 50%;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.45);
+  background: var(--chip-on);
   font: 300 24px/1 var(--serif);
   color: var(--ink-soft);
 }
 .step.minus { left: 6px; }
 .step.plus { right: 6px; }
 .step:active { transform: scale(0.92); }
-
-.sounds button { background: rgba(255, 255, 255, 0.25); }
+.sounds button { background: var(--chip-on); }
 .ghost { border-color: var(--line); }
 
 /* ───────── session ───────── */
 .session { justify-content: flex-start; }
 .session-top {
-  margin-top: max(8vh, calc(var(--safe-t) + 52px));
+  margin-top: max(10vh, calc(var(--safe-t) + 60px));
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
 }
 .session .time { font-size: clamp(58px, 18vw, 92px); color: var(--ink); }
+/* Lily pads drift behind the clock; a soft shadow keeps it readable. */
+.session .time, .session .breath, .readout { text-shadow: 0 2px 22px rgba(4, 16, 13, 0.75), 0 0 6px rgba(4, 16, 13, 0.5); }
 .session .time.long { font-size: clamp(44px, 13vw, 70px); }
-.ctrl svg { background: rgba(255, 255, 255, 0.5); }
+.ctrl svg { background: var(--chip-on); }
 
 /* ───────── complete ───────── */
 .glyph { width: 56px; height: 56px; margin-bottom: 20px; fill: none; stroke: var(--ink-soft); stroke-width: 1.2; }
-.complete .eyebrow { letter-spacing: 0.3em; }
 
 @media (orientation: landscape) and (max-height: 540px) {
   .setup {
@@ -102,5 +92,5 @@ body {
   .intro { grid-area: intro; align-self: end; }
   .stage { grid-area: stage; height: 100%; }
   .options { grid-area: options; align-self: start; }
-  .session-top { margin-top: calc(var(--safe-t) + 16px); }
+  .session-top { margin-top: calc(var(--safe-t) + 48px); }
 }

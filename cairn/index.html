@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#ece5d8">
+  <meta name="theme-color" content="#0f2a27">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Cairn">
-  <meta name="description" content="A stone-stacking rest timer.">
+  <meta name="description" content="A koi pond rest timer.">
   <title>Cairn · Hush</title>
   <link rel="manifest" href="../manifest.webmanifest">
   <link rel="icon" href="../icon.svg" type="image/svg+xml">
@@ -26,7 +26,7 @@
     <section class="screen setup" aria-labelledby="setupTitle">
       <header class="intro">
         <p class="eyebrow">Cairn</p>
-        <h1 id="setupTitle">Stack a stone for every five minutes.</h1>
+        <h1 id="setupTitle">Sit by the water a while.</h1>
       </header>
 
       <div class="stage" id="stage" role="slider" tabindex="0"
@@ -34,11 +34,11 @@
            aria-valuenow="30" aria-valuetext="30 minutes">
         <div class="readout">
           <span class="num" id="setNum">30</span>
-          <span class="unit" id="setUnit">minutes · six stones</span>
+          <span class="unit" id="setUnit">minutes</span>
         </div>
-        <p class="stage-hint">Tap to place &middot; swipe down to lift</p>
-        <button class="step minus" id="minus" type="button" aria-label="Lift a stone, five minutes less">&minus;</button>
-        <button class="step plus" id="plus" type="button" aria-label="Place a stone, five minutes more">+</button>
+        <p class="stage-hint">Tap for more &middot; swipe down for less</p>
+        <button class="step minus" id="minus" type="button" aria-label="Five minutes less">&minus;</button>
+        <button class="step plus" id="plus" type="button" aria-label="Five minutes more">+</button>
       </div>
 
       <div class="options">
@@ -77,16 +77,13 @@
 
     <section class="screen complete" aria-labelledby="doneTitle">
       <svg class="glyph" viewBox="0 0 60 60" aria-hidden="true">
-        <ellipse cx="30" cy="50" rx="22" ry="7"/>
-        <ellipse cx="31" cy="36" rx="15" ry="6"/>
-        <ellipse cx="29" cy="24.5" rx="10" ry="4.6"/>
-        <ellipse cx="30" cy="15.5" rx="6" ry="3.4"/>
+        <circle cx="30" cy="30" r="5"/><circle cx="30" cy="30" r="13" opacity=".7"/><circle cx="30" cy="30" r="22" opacity=".4"/>
       </svg>
-      <p class="eyebrow">The stones have returned to light</p>
+      <p class="eyebrow">The water is still again</p>
       <h2 id="doneTitle">Welcome back.</h2>
       <p class="rested" id="rested">You rested for 30 minutes.</p>
       <p class="aftercare" id="aftercare">Take a slow sip of water before you rise.</p>
-      <button class="ghost" id="again" type="button">Stack again</button>
+      <button class="ghost" id="again" type="button">Again</button>
     </section>
 
   </main>

@@ -346,7 +346,11 @@
         const notes = [523.25, 587.33, 659.25, 783.99, 880, 1046.5];
         chain(c, () => (2500 + Math.random() * 7000) / now(breeze.gain), () => {
           const n = Math.random() < 0.35 ? 2 + Math.floor(Math.random() * 2) : 1;
-          for (let i = 0; i < n; i++) chime(c.bed, i * (0.18 + Math.random() * 0.3), notes[Math.floor(Math.random() * notes.length)]);
+          for (let i = 0; i < n; i++) {
+            const d = i * (0.18 + Math.random() * 0.3), f = notes[Math.floor(Math.random() * notes.length)];
+            chime(c.bed, d, f);
+            setTimeout(() => emit('chime', { f }), d * 1000);
+          }
         });
       },
     };
