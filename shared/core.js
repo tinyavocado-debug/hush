@@ -354,9 +354,11 @@
     A.ensure = ensure;
     A.startAmbience = (kind) => {
       if (!ensure()) return;
-      A.stopAmbience(1.5);
       A.dimmed = false;
       to(ambienceGain.gain, 1, 0.3);
+      // Already playing (a preview from the setup screen): keep it, and let it settle to rest.
+      if (cur && cur.kind === kind) { settle(); return; }
+      A.stopAmbience(1.5);
       if (!BEDS[kind]) return;
       const c = { kind, bed: gain(0), sources: [], chains: [], stopped: false, breathe: null };
       c.bed.connect(ambienceGain);
@@ -376,7 +378,22 @@
       }, fade * 1000 + 250);
     };
     let breathPattern = Spa.pattern; // the pattern of the breath being shaped
-    A.breathe = (p, P = Spa.pattern, cycle = 1) => { breathPattern = P; if (ctx && cur?.breathe && !A.dimmed) cur.breathe(p, cycle); };
+    A.breathe = (p, P = Spa.pattern, cycle = 1) => {
+      breathPattern = P;
+      if (ctx && cur?.breathe && !A.dimmed) { cur.lastBreath = { p, P, t: ctx.currentTime }; cur.breathe(p, cycle); }
+    };
+    A.playing = () => cur?.kind ?? null;
+    // Ease the bed from wherever its breath stands down to rest over the session's opening
+    // stillness, as the scene does, by shaping it with a lone breath out that ends at rest then.
+    function settle() {
+      const lb = cur.lastBreath;
+      if (!lb || !cur.breathe) return;
+      const k = Spa.breathAt(Math.min(lb.P.cycle - 1, lb.p + (ctx.currentTime - lb.t) * 1000), lb.P).k;
+      const f = Math.acos(clamp(2 * k - 1, -1, 1)) / Math.PI; // how far through a breath out k sits
+      const L = f > 0.98 ? Spa.SETTLE : Spa.SETTLE / (1 - f);
+      breathPattern = { inhale: 0, holdIn: 0, exhale: L, holdOut: 1, cycle: L + 1 };
+      cur.breathe(Math.min(L, f * L), 0);
+    }
     A.dim = (on) => { A.dimmed = on; if (ctx) to(ambienceGain.gain, on ? 0.2 : 1, 1.5); };
     A.mute = (on) => { if (ctx) to(muteGain.gain, on ? 0 : 1, 0.6); };
 
@@ -450,11 +467,10 @@
 
     const st = {
       minutes: snap(store.get('minutes', cfg.defaultMinutes)),
-      sound: store.get('sound', cfg.defaultSound),
+      sound: 'silence', // every visit starts quiet; choosing a sound plays it straight away
       phase: 'setup', total: 0, endAt: 0, remaining: 0, paused: false, muted: false,
       lastSecs: -1, lastCycle: -1, label: '', sessionStart: 0,
     };
-    if (!cfg.sounds.includes(st.sound)) st.sound = cfg.defaultSound;
 
     const el = {
       time: $('#time'), ring: $('#ringFill'), breath: $('#breath'),
@@ -529,8 +545,15 @@
       if (el.sound) el.sound.hidden = st.sound === 'silence';
     }
 
+    // Choosing a sound on the setup screen plays it, breathing with the scene, so it can be
+    // heard before beginning. Begin carries it on into the session.
+    function preview(kind) {
+      if (kind === audio.playing()) return;
+      if (kind === 'silence') audio.stopAmbience(1.5);
+      else { audio.startAmbience(kind); st.previewCycle = -1; }
+    }
     document.querySelectorAll('[data-sound]').forEach((b) =>
-      b.addEventListener('click', () => { st.sound = b.dataset.sound; store.set('sound', st.sound); renderChoices(); audio.ensure(); audio.tick(1.3); }));
+      b.addEventListener('click', () => { st.sound = b.dataset.sound; renderChoices(); audio.ensure(); audio.tick(1.3); preview(st.sound); }));
 
     function setPhase(p) {
       st.phase = p;
@@ -622,7 +645,7 @@
     }
 
     $('#begin').addEventListener('click', begin);
-    $('#again').addEventListener('click', () => { audio.ensure(); setPhase('setup'); });
+    $('#again').addEventListener('click', () => { audio.ensure(); st.sound = 'silence'; renderChoices(); setPhase('setup'); });
     el.pause.addEventListener('click', togglePause);
     $('#endBtn').addEventListener('click', () => complete(true));
     el.sound?.addEventListener('click', () => {
@@ -703,7 +726,13 @@
         if (st.remaining <= 0 && !st.paused) complete(false);
       } else {
         // Outside a session the scene still breathes, on a free-running clock.
-        info = { phase: st.phase, minutes: st.minutes, paused: false, progress: 0, breath: Spa.breathAt(now) };
+        const breath = Spa.breathAt(now);
+        // A sound being previewed follows this same clock.
+        if (st.phase === 'setup' && st.sound !== 'silence' && breath.cycle !== st.previewCycle) {
+          st.previewCycle = breath.cycle;
+          audio.breathe(breath.p, Spa.pattern, breath.cycle);
+        }
+        info = { phase: st.phase, minutes: st.minutes, paused: false, progress: 0, breath };
       }
       cfg.frame?.(dt, t, info);
     }

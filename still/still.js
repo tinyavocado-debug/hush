@@ -331,7 +331,7 @@
 
   const app = Spa.createApp({
     key: 'still', title: 'Still · Hush', short: 'Still',
-    min: 5, max: MAX, defaultMinutes: 30, defaultSound: 'ocean',
+    min: 5, max: MAX, defaultMinutes: 30,
     sounds: ['ocean', 'rain', 'silence'],
     bell: { f0: 196, vol: 0.5 },
     render,

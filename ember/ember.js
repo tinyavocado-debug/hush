@@ -340,7 +340,7 @@
 
   const app = Spa.createApp({
     key: 'ember', title: 'Ember · Hush', short: 'Ember',
-    min: 5, max: MAX, defaultMinutes: 30, defaultSound: 'temple',
+    min: 5, max: MAX, defaultMinutes: 30,
     sounds: ['temple', 'hearth', 'silence'],
     bell: { f0: 174.6, vol: 0.5 },
     render,

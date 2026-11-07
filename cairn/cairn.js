@@ -366,7 +366,7 @@
 
   const app = Spa.createApp({
     key: 'cairn', title: 'Cairn · Hush', short: 'Cairn',
-    min: 5, max: MAX, defaultMinutes: 30, defaultSound: 'garden',
+    min: 5, max: MAX, defaultMinutes: 30,
     sounds: ['garden', 'rain', 'silence'],
     bell: { f0: 261.6, vol: 0.42 },
     render,
