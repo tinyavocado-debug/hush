@@ -215,22 +215,26 @@
     // lower softens the top of every breath in every room.
     const BREATH_DEPTH = 0.65;
 
-    // Shape a parameter to follow one breath from position p: rise over the inhale, stay up
-    // through any hold, then settle over the exhale (and rest there through the hold after it).
-    function breathShape(param, p, hi, lo, tau = 3) {
-      hi = lo + (hi - lo) * BREATH_DEPTH;
-      const P = breathPattern, full = P.inhale + P.holdIn, empty = full + P.exhale;
-      const t = ctx.currentTime;
-      const up = Math.max(0, (P.inhale - p) / 1000);          // seconds of rise left
-      const top = Math.max(0, (full - Math.max(p, P.inhale)) / 1000); // then seconds held at the top
-      const down = Math.max(0.5, (empty - Math.max(p, full)) / 1000); // then seconds to settle
-      const v0 = hold(param, t), tc = Math.max(0.1, down / tau), peak = up > 0 ? hi : v0, fall = t + up + top;
-      if (up > 0) param.linearRampToValueAtTime(hi, t + up);
-      param.setTargetAtTime(lo, fall, tc);
-      curves.set(param, (x) => (x < t + up
-        ? v0 + (hi - v0) * Math.max(0, x - t) / up
-        : x < fall ? peak : lo + (peak - lo) * Math.exp(-(x - fall) / tc)));
+    // Shape a parameter to follow one breath from position p to the end of the cycle.
+    // fn maps a breath (as Spa.breathAt gives it: stage, f, k) to the param's value, so sound
+    // runs on the very same clock and curve as the visuals.
+    // Built from short linear ramps, not setValueCurveAtTime: a curve can't be cut short safely.
+    const STEP = 0.1; // seconds per ramp segment
+    function breathCurve(param, p, fn) {
+      const P = breathPattern, t = ctx.currentTime, span = Math.max(0, (P.cycle - p) / 1000);
+      const val = (x) => fn(Spa.breathAt(p + Math.min(span, Math.max(0, x - t)) * 1000, P));
+      const v0 = hold(param, t);
+      // Ease from wherever the param stands into the breath over the first segment.
+      for (let s = STEP; s < span + STEP; s += STEP) param.linearRampToValueAtTime(val(t + Math.min(s, span)), t + Math.min(s, span));
+      curves.set(param, (x) => (x < t + STEP ? v0 + (val(t + STEP) - v0) * Math.max(0, x - t) / STEP : val(x)));
     }
+    // Rise with fullness k from lo to hi (softened by BREATH_DEPTH). Frequencies (log) move
+    // evenly in pitch rather than in Hz.
+    function breathShape(param, p, hi, lo, log = false) {
+      hi = log ? lo * Math.pow(hi / lo, BREATH_DEPTH) : lo + (hi - lo) * BREATH_DEPTH;
+      breathCurve(param, p, (b) => (log ? lo * Math.pow(hi / lo, b.k) : lo + (hi - lo) * b.k));
+    }
+    const sweep = (lo, hi, k) => lo * Math.pow(hi / lo, k);
 
     function chime(dest, delay, f) {
       const t = ctx.currentTime + 0.02 + delay;
@@ -254,9 +258,9 @@
         const foam = gain(0);
         src(c, buf('white')).connect(filt('bandpass', 2600, 0.5)).connect(foam).connect(c.bed);
         c.breathe = (p) => {
-          breathShape(surf.frequency, p, 1700, 380, 3.2);
-          breathShape(swell.gain, p, 0.95, 0.3, 3);
-          breathShape(foam.gain, p, 0.07, 0, 4);
+          breathShape(surf.frequency, p, 1700, 380, true);
+          breathShape(swell.gain, p, 0.95, 0.3);
+          breathShape(foam.gain, p, 0.07, 0);
         };
       },
       rain(c) {
@@ -265,8 +269,8 @@
         src(c, buf('white')).connect(filt('highpass', 900)).connect(hissTone).connect(hiss).connect(c.bed);
         src(c, buf('brown'), 1.1).connect(filt('lowpass', 500)).connect(gain(0.45)).connect(c.bed);
         c.breathe = (p) => {
-          breathShape(hissTone.frequency, p, 8000, 3200, 3);
-          breathShape(hiss.gain, p, 0.22, 0.09, 3);
+          breathShape(hissTone.frequency, p, 8000, 3200, true);
+          breathShape(hiss.gain, p, 0.22, 0.09);
         };
         chain(c, () => (90 + Math.random() * Math.random() * 900) / (0.5 + 4 * now(hiss.gain)), () => {
           const t = ctx.currentTime + 0.01, f = 900 + Math.random() * 2600;
@@ -283,15 +287,27 @@
         });
       },
       temple(c) {
-        const tone = filt('lowpass', 800, 0.4);
-        tone.connect(gain(1)).connect(c.bed);
-        [[98, 0.16], [98.35, 0.06], [147, 0.08], [196.2, 0.07], [293.7, 0.03], [392.4, 0.018]].forEach(([f, a], i) => {
+        // The fundamental stays steady; the upper tones bloom and a breath of air brightens on
+        // the in-breath. A high note marks the start of each in-breath, a low one each out-breath.
+        const high = gain(0.35);
+        high.connect(c.bed);
+        [[98, 0.16, c.bed], [98.35, 0.03, c.bed], [147, 0.08, c.bed], [196.2, 0.09, high], [293.7, 0.05, high], [392.4, 0.03, high]].forEach(([f, a, out], i) => {
           const g = gain(a);
-          osc(c, 'sine', f).connect(g).connect(tone);
-          lfo(c, 0.035 + i * 0.021, a * 0.6, g.gain);
+          osc(c, 'sine', f).connect(g).connect(out);
+          lfo(c, 0.035 + i * 0.021, a * 0.15, g.gain); // slow shimmer only, so the breath leads
         });
-        src(c, buf('brown')).connect(filt('bandpass', 700, 0.6)).connect(gain(0.12)).connect(c.bed);
-        c.breathe = (p) => breathShape(tone.frequency, p, 1500, 650, 3);
+        const airTone = filt('bandpass', 600, 1), air = gain(0);
+        src(c, buf('white')).connect(airTone).connect(air).connect(c.bed);
+        c.breathe = (p) => {
+          const P = breathPattern;
+          breathCurve(high.gain, p, (b) => 0.35 + 0.81 * b.k);
+          breathCurve(air.gain, p, (b) => 0.12 * b.k);
+          breathCurve(airTone.frequency, p, (b) => sweep(600, 1300, b.k));
+          clearTimeout(c.cueT);
+          if (p < 300) chime(c.bed, 0, 784);
+          const outIn = P.inhale + P.holdIn - p;
+          if (outIn > 0) c.cueT = setTimeout(() => { if (!c.stopped && !A.dimmed) chime(c.bed, 0, 392); }, outIn);
+        };
       },
       hearth(c) {
         // Breathes like bellows: roar and rumble rise on the in-breath, and the crackles with them.
@@ -299,10 +315,10 @@
         src(c, buf('brown'), 0.8).connect(rumble).connect(gain(0.6)).connect(c.bed);
         const roar = gain(0.05);
         src(c, buf('white')).connect(filt('bandpass', 900, 0.5)).connect(roar).connect(c.bed);
-        lfo(c, 0.13, 0.03, roar.gain);
+        lfo(c, 0.13, 0.006, roar.gain); // a faint flicker, small next to the breath
         c.breathe = (p) => {
-          breathShape(roar.gain, p, 0.11, 0.035, 3);
-          breathShape(rumble.frequency, p, 560, 240, 3);
+          breathShape(roar.gain, p, 0.11, 0.035);
+          breathShape(rumble.frequency, p, 560, 240, true);
         };
         chain(c, () => (25 + Math.random() ** 2 * 520) / (0.5 + 10 * now(roar.gain)), () => {
           const t = ctx.currentTime + 0.005, s = ctx.createBufferSource();
@@ -318,7 +334,7 @@
         // A breeze through the leaves on each in-breath; the chimes ring more while it blows.
         const breeze = gain(1);
         breeze.connect(c.bed);
-        c.breathe = (p) => breathShape(breeze.gain, p, 1.7, 0.6, 3);
+        c.breathe = (p) => breathShape(breeze.gain, p, 1.7, 0.6);
         src(c, buf('brown'), 1.2).connect(filt('lowpass', 400)).connect(gain(0.22)).connect(c.bed);
         [[700, 1.2, 0.07, 250, 0.31], [1700, 0.9, 0.05, 500, 0.53], [3200, 0.7, 0.022, 900, 0.71]].forEach(([f, q, a, dep, rate]) => {
           const b = filt('bandpass', f, q);

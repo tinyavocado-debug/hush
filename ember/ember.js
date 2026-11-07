@@ -91,9 +91,10 @@
     // An unseen hearth, warming the room when chosen.
     if (s.phase === 'session' && app.state.sound === 'hearth') {
       crackleBoost *= 0.9;
-      const fl = 0.8 + 0.1 * Math.sin(t * 3.1) + 0.07 * Math.sin(t * 7.3) + crackleBoost;
-      const r = Math.max(W, H) * 0.75;
-      g.globalAlpha = 0.14 * fl * focus;
+      // Rises with the roar on each in-breath.
+      const fl = 0.85 + 0.05 * Math.sin(t * 3.1) + 0.04 * Math.sin(t * 7.3) + crackleBoost;
+      const r = Math.max(W, H) * 0.75, k = s.breath?.k ?? 0;
+      g.globalAlpha = (0.08 + 0.1 * k) * fl * focus;
       g.drawImage(warmS, -W * 0.25 - r, H * 1.05 - r, r * 2, r * 2);
     }
     g.globalAlpha = 1;
@@ -149,11 +150,12 @@
         g.fillRect(x - 2.6, tipY - ashLen, 5.2, ashLen);
       }
       g.globalCompositeOperation = 'lighter';
-      const r1 = (14 + 8 * breath + flare * 40) * fl * dim;
+      // The tip brightens and its halo widens on the in-breath, as the sound swells.
+      const r1 = (12 + 14 * breath + crackleBoost * 8 + flare * 40) * fl * dim;
       g.globalAlpha = 0.9 * dim;
       g.drawImage(emberS, x - r1, tipY - r1, r1 * 2, r1 * 2);
-      const r2 = (90 + 30 * breath + flare * 140) * dim;
-      g.globalAlpha = 0.12 * fl;
+      const r2 = (75 + 80 * breath + flare * 140) * dim;
+      g.globalAlpha = (0.07 + 0.1 * breath) * fl;
       g.drawImage(warmS, x - r2, tipY - r2, r2 * 2, r2 * 2);
       g.globalAlpha = 1;
       g.fillStyle = `rgba(255,${170 + 50 * breath},${90 + 40 * breath},${0.95 * dim})`;
