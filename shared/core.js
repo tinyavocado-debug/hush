@@ -298,13 +298,14 @@
         });
         const airTone = filt('bandpass', 600, 1), air = gain(0);
         src(c, buf('white')).connect(airTone).connect(air).connect(c.bed);
-        c.breathe = (p) => {
+        c.breathe = (p, cycle) => {
           const P = breathPattern;
           breathCurve(high.gain, p, (b) => 0.35 + 0.81 * b.k);
           breathCurve(air.gain, p, (b) => 0.12 * b.k);
           breathCurve(airTone.frequency, p, (b) => sweep(600, 1300, b.k));
           clearTimeout(c.cueT);
-          if (p < 300) chime(c.bed, 0, 784);
+          // No high note on the opening breath in: the bowl has just rung. It first sounds on the second.
+          if (p < 300 && cycle > 0) chime(c.bed, 0, 784);
           const outIn = P.inhale + P.holdIn - p;
           if (outIn > 0) c.cueT = setTimeout(() => { if (!c.stopped && !A.dimmed) chime(c.bed, 0, 392); }, outIn);
         };
@@ -375,7 +376,7 @@
       }, fade * 1000 + 250);
     };
     let breathPattern = Spa.pattern; // the pattern of the breath being shaped
-    A.breathe = (p, P = Spa.pattern) => { breathPattern = P; if (ctx && cur?.breathe && !A.dimmed) cur.breathe(p); };
+    A.breathe = (p, P = Spa.pattern, cycle = 1) => { breathPattern = P; if (ctx && cur?.breathe && !A.dimmed) cur.breathe(p, cycle); };
     A.dim = (on) => { A.dimmed = on; if (ctx) to(ambienceGain.gain, on ? 0.2 : 1, 1.5); };
     A.mute = (on) => { if (ctx) to(muteGain.gain, on ? 0 : 1, 0.6); };
 
@@ -692,7 +693,7 @@
         if (el.ring) el.ring.style.strokeDashoffset = `${ringC * (elapsed / st.total)}`;
         if (!st.paused && !settling && breath.cycle !== st.lastCycle) {
           st.lastCycle = breath.cycle;
-          audio.breathe(breath.p, st.bPat);
+          audio.breathe(breath.p, st.bPat, breath.cycle);
           cfg.onBreath?.(breath);
         }
         // During the opening breath the large "breathe in" speaks instead of the small label.
