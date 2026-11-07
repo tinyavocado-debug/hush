@@ -30,6 +30,8 @@
   const flakes = [];
   let emitAcc = 0, ashLen = 0, ashMax = 8, flare = 0, crackleBoost = 0;
   let focus = 0, shownMin = 30, lit = false;
+  let lastStage = '';
+  const sparks = []; // a few sparks rise from the tip as each breath in starts
 
   function resize() {
     const dpr = Math.min(2, devicePixelRatio || 1);
@@ -183,6 +185,34 @@
     return { x, y: tipY - ashLen };
   }
 
+  // Sparks as each breath in starts, with the drone's high chime.
+  function spark(tip) {
+    for (let i = 0, n = 6 + Math.floor(Math.random() * 4); i < n; i++) {
+      sparks.push({ x: tip.x, y: tip.y, vx: (Math.random() - 0.5) * 50, vy: -70 - Math.random() * 90, age: 0, life: 1.2 + Math.random() * 1.4 });
+    }
+  }
+
+  function updateSparks(dt) {
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const p = sparks[i];
+      p.age += dt; p.vy *= Math.pow(0.4, dt); p.vx *= Math.pow(0.5, dt);
+      p.x += (p.vx + Math.sin(p.age * 9 + i) * 12) * dt; p.y += p.vy * dt;
+      if (p.age > p.life) sparks.splice(i, 1);
+    }
+  }
+
+  function drawSparks() {
+    g.globalCompositeOperation = 'lighter';
+    for (const p of sparks) {
+      g.globalAlpha = Math.pow(1 - p.age / p.life, 1.3);
+      g.drawImage(emberS, p.x - 7, p.y - 7, 14, 14);
+      g.fillStyle = 'rgba(255,214,150,0.9)';
+      g.fillRect(p.x - 0.8, p.y - 0.8, 1.6, 1.6);
+    }
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'source-over';
+  }
+
   function updateSmoke(dt, t, tip, emit, wind) {
     if (emit) {
       emitAcc += dt;
@@ -255,8 +285,12 @@
 
     const emitting = lit && s.phase === 'session' && focus > 0.95 && (!s.paused || Math.random() < 0.3);
     const wind = s.breath ? (s.breath.k - 0.5) * 4 : 0;
+    const stage = s.phase === 'session' && !s.opening && s.breath ? s.breath.stage : '';
+    if (stage !== lastStage) { if (stage === 'in' && emitting && !s.paused) spark(tip); lastStage = stage; }
     updateSmoke(dt, t, tip, emitting, wind);
+    updateSparks(dt);
     drawSmoke();
+    drawSparks();
   }
 
   /* ───────── setup gesture ───────── */
@@ -306,7 +340,7 @@
     bell: { f0: 174.6, vol: 0.5 },
     render,
     onStep: (m) => Spa.audio.tick(0.75 + m / 200),
-    onBegin() { lit = true; flare = 1; ashLen = 0; smoke[0].length = 0; smoke[1].length = 0; },
+    onBegin() { lit = true; flare = 1; ashLen = 0; smoke[0].length = 0; smoke[1].length = 0; sparks.length = 0; },
     onComplete() { lit = false; flare = 0; },
     onPhase(p) { if (p === 'setup') { lit = false; flakes.length = 0; } },
     frame,
