@@ -28,7 +28,7 @@
   }));
   const smoke = [[], []];
   const flakes = [];
-  let emitAcc = 0, ashLen = 0, ashMax = 8, flare = 0, crackleBoost = 0;
+  let emitAcc = 0, ashLen = 0, flare = 0, crackleBoost = 0;
   let focus = 0, shownMin = 30, lit = false;
   let lastStage = '';
   const sparks = []; // a few sparks rise from the tip as each breath in starts
@@ -262,13 +262,19 @@
     if (s.phase === 'session') { coated = s.remaining / 60000; total = s.total / 60000; }
     else if (s.phase === 'complete') { coated = 0; total = app.minutes; }
 
-    // Ash grows from the burning tip and now and then drops into the dish.
+    // The turn of each breath: sparks as the breath in starts (below, once the tip is drawn),
+    // and the ash drops as the breath out starts, so the smoke gives its small jump.
+    const stage = s.phase === 'session' && !s.opening && s.breath ? s.breath.stage : '';
+    const turned = stage !== lastStage && lit && focus > 0.95 && !s.paused ? stage : '';
+    lastStage = stage;
+
+    // Ash grows from the burning tip and drops into the dish with each breath out.
     if (lit && s.phase === 'session' && !s.paused) {
       ashLen += dt * 0.6;
-      if (ashLen > ashMax) {
+      if (turned === 'out' && ashLen > 1) {
         const tipY = geo.base - BAMBOO - coated * geo.ppm;
         flakes.push({ x: geo.x, y: tipY - ashLen / 2, vy: 0, vx: (Math.random() - 0.5) * 20, a: 0.9 });
-        ashLen = 0; ashMax = 5 + Math.random() * 8;
+        ashLen = 0;
       }
     }
     for (let i = flakes.length - 1; i >= 0; i--) {
@@ -285,8 +291,7 @@
 
     const emitting = lit && s.phase === 'session' && focus > 0.95 && (!s.paused || Math.random() < 0.3);
     const wind = s.breath ? (s.breath.k - 0.5) * 4 : 0;
-    const stage = s.phase === 'session' && !s.opening && s.breath ? s.breath.stage : '';
-    if (stage !== lastStage) { if (stage === 'in' && emitting && !s.paused) spark(tip); lastStage = stage; }
+    if (turned === 'in') spark(tip);
     updateSmoke(dt, t, tip, emitting, wind);
     updateSparks(dt);
     drawSmoke();
