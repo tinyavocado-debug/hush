@@ -6,7 +6,7 @@
   const TAU = Math.PI * 2;
   const R = 118, DIAL_C = TAU * R, MAX = 180;
 
-  /* ───────── canvas scene: drifting blue light, stars, a plum glow, haze, ripples ───────── */
+  /* ───────── canvas scene: drifting blue light, stars, a blue glow round the sphere, a plum glow, haze, ripples ───────── */
   const scene = (() => {
     const cv = $('#scene'), g = cv.getContext('2d');
     let W = 0, H = 0, focus = 0, focusTarget = 0;
@@ -22,7 +22,7 @@
       x.fillStyle = gr; x.fillRect(0, 0, s, s);
       return c;
     }
-    const steamS = sprite(255, 244, 228), causticS = sprite(100, 140, 240), candleS = sprite(215, 110, 190);
+    const steamS = sprite(255, 244, 228), causticS = sprite(80, 110, 230), candleS = sprite(150, 80, 170);
 
     function makeSteam(initial) {
       const s = Math.max(W, H), maxLife = 16 + Math.random() * 18;
@@ -44,7 +44,7 @@
       steam.length = n;
       // A still field of stars, each glimmering at its own pace.
       stars.length = 0;
-      for (let i = 0, m = Math.round(clamp((W * H) / 5000, 60, 260)); i < m; i++) {
+      for (let i = 0, m = Math.round(clamp((W * H) / 7000, 40, 180)); i < m; i++) {
         stars.push({ x: Math.random() * W, y: Math.random() * H, r: 0.4 + Math.pow(Math.random(), 4) * 1.3,
           a: 0.25 + Math.random() * 0.65, ph: Math.random() * TAU, sp: 0.4 + Math.random() * 1.2 });
       }
@@ -59,7 +59,7 @@
       if (ripples.length > 40) ripples.shift();
     }
 
-    function frame(dt, t) {
+    function frame(dt, t, c) {
       focus += (focusTarget - focus) * Math.min(1, dt * 0.6);
       g.clearRect(0, 0, W, H);
       g.globalCompositeOperation = 'lighter';
@@ -79,6 +79,12 @@
         g.beginPath(); g.arc(st.x, st.y, st.r, 0, TAU); g.fill();
       }
 
+      // A blue glow round the dial, then round the sphere, brightening as each breath comes in.
+      const hr = c.r * 1.6, hg = g.createRadialGradient(c.x, c.y, c.r * 0.4, c.x, c.y, hr);
+      hg.addColorStop(0, 'rgba(80,95,255,0.9)'); hg.addColorStop(0.45, 'rgba(80,95,255,0.35)'); hg.addColorStop(1, 'rgba(80,95,255,0)');
+      g.globalAlpha = 0.6 + 0.4 * c.k; g.fillStyle = hg;
+      g.beginPath(); g.arc(c.x, c.y, hr, 0, TAU); g.fill();
+
       const flick = 0.85 + 0.08 * Math.sin(t * 2.3) + 0.05 * Math.sin(t * 5.7 + 1.3) + 0.03 * Math.sin(t * 11.1);
       const cr = big * 0.55;
       g.globalAlpha = 0.16 * flick;
@@ -91,7 +97,7 @@
         p.r += dt * 2;
         if (p.life > p.maxLife || p.y < -p.r) Object.assign(p, makeSteam(false));
         const k = Math.sin(Math.PI * Math.min(1, p.life / p.maxLife));
-        g.globalAlpha = p.a * k * (1 + 0.4 * focus);
+        g.globalAlpha = p.a * k * (1 + 0.4 * focus) * 0.2; // only a faint haze in space
         const sx = Math.sin(t * 0.2 + p.ph) * p.sway;
         g.drawImage(steamS, p.x + sx - p.r, p.y - p.r, p.r * 2, p.r * 2);
       }
@@ -367,7 +373,10 @@
         scene.ripple(scene.W * (0.15 + Math.random() * 0.7), scene.H * (0.15 + Math.random() * 0.7),
           { max: 60 + Math.random() * 120, life: 5, rings: 3, gap: 12, alpha: 0.14 });
       }
-      scene.frame(dt, t);
+      // The glow centres on the dial while setting up, then on the sphere.
+      const el = s.phase === 'session' ? orbWrap : s.phase === 'setup' ? dial : null, rb = el && el.getBoundingClientRect();
+      scene.frame(dt, t, rb ? { x: rb.left + rb.width / 2, y: rb.top + rb.height / 2, r: rb.width / 2, k: b.k }
+        : { x: scene.W / 2, y: scene.H * 0.45, r: Math.min(scene.W, scene.H) * 0.3, k: b.k });
     },
   });
 })();
