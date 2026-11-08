@@ -126,3 +126,4 @@ body {
   .options { grid-area: options; align-self: start; }
   .session-top { margin-top: calc(var(--safe-t) + 20px); }
 }
+

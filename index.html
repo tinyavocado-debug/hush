@@ -69,19 +69,25 @@
     .card p { margin: 0; font-size: 14px; line-height: 1.55; opacity: 0.78; max-width: 34ch; }
     .card .how { margin-top: 12px; font-size: 10.5px; letter-spacing: 0.24em; text-transform: uppercase; opacity: 0.6; }
 
-    /* Still */
-    .still { --c-ink: #eadfcb; background: radial-gradient(90% 70% at 50% 35%, #1a3f3b 0%, #0b201f 80%); }
-    .still .art::before, .still .art::after {
+    /* Orbit */
+    .orbit { --c-ink: #eadfcb; background: radial-gradient(75% 45% at 50% 38%, #3b2a8a 0%, #1a1650 35%, #070618 75%, #04030c 100%); }
+    .orbit .art::before, .orbit .art::after {
       content: ''; position: absolute; left: 50%; top: 38%;
       width: 120px; height: 120px; margin: -60px 0 0 -60px;
       border-radius: 50%; border: 1px solid rgba(234, 223, 203, 0.4);
       animation: ripple 6s ease-out infinite;
     }
-    .still .art::after { animation-delay: 3s; }
-    .still .stone {
+    .orbit .art::after { animation-delay: 3s; }
+    .orbit .stars {
+      position: absolute; left: 0; top: 0; width: 1.5px; height: 1.5px; border-radius: 50%;
+      box-shadow: 169px 81px rgba(255,255,255,.9), 337px 28px rgba(255,255,255,.35), 278px 52px rgba(255,255,255,.7), 302px 33px rgba(255,255,255,.5), 23px 48px rgba(255,255,255,.9), 218px 39px rgba(255,255,255,.5), 50px 286px rgba(255,255,255,.9), 34px 293px rgba(255,255,255,.35), 118px 326px rgba(255,255,255,.35), 299px 303px rgba(255,255,255,.9), 29px 117px rgba(255,255,255,.35), 289px 72px rgba(255,255,255,.7), 218px 77px rgba(255,255,255,.35), 296px 161px rgba(255,255,255,.5), 56px 301px rgba(255,255,255,.5), 194px 53px rgba(255,255,255,.35), 292px 34px rgba(255,255,255,.5), 258px 276px rgba(255,255,255,.9), 164px 242px rgba(255,255,255,.9), 189px 157px rgba(255,255,255,.5), 96px 128px rgba(255,255,255,.35), 298px 157px rgba(255,255,255,.9), 179px 233px rgba(255,255,255,.7), 315px 41px rgba(255,255,255,.35), 266px 218px rgba(255,255,255,.5), 179px 81px rgba(255,255,255,.9), 219px 24px rgba(255,255,255,.35), 289px 297px rgba(255,255,255,.7), 178px 183px rgba(255,255,255,.9), 300px 237px rgba(255,255,255,.35), 51px 142px rgba(255,255,255,.9), 37px 35px rgba(255,255,255,.7), 335px 299px rgba(255,255,255,.9), 149px 201px rgba(255,255,255,.7);
+      animation: twinkle 5s ease-in-out infinite alternate;
+    }
+    @keyframes twinkle { to { opacity: 0.55; } }
+    .orbit .stone {
       position: absolute; left: 50%; top: 38%; width: 30px; height: 26px; margin: -13px 0 0 -15px;
       border-radius: 52% 48% 46% 54% / 58% 56% 44% 42%;
-      background: radial-gradient(circle at 36% 30%, #c1bdb6, #a49e93 55%, #6b6760); /* Cairn's stone grey */
+      background: radial-gradient(circle at 36% 30%, #c1bdb6, #a49e93 55%, #6b6760);
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4), 0 0 30px rgba(242, 197, 138, 0.35);
     }
     @keyframes ripple { from { transform: scale(0.3); opacity: 0.9; } to { transform: scale(3.2); opacity: 0; } }
@@ -111,22 +117,30 @@
     @keyframes flicker { 50% { opacity: 0.75; } }
     @keyframes curl { to { transform: translateX(10px) skewX(12deg); opacity: 0.6; } }
 
-    /* Cairn */
-    .cairn { --c-ink: #2f3b35; background: linear-gradient(180deg, #f4efe6 0%, #ece5d8 58%, #cfd9d2 58.2%, #b4c6be 100%); }
-    .cairn .sun { position: absolute; left: -20%; top: -30%; width: 80%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, rgba(255, 228, 180, 0.9), transparent 65%); }
-    .cairn .stack { position: absolute; left: 72%; top: 58%; transform: translate(-50%, -100%); display: flex; flex-direction: column-reverse; align-items: center; }
-    .cairn .stack i {
-      display: block; margin-top: -3px; border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%;
-      background: linear-gradient(180deg, #c9c3b8, #8f8b83 60%, #5f5d58);
-      animation: settle 5s ease-in-out infinite;
+    /* Pond */
+    .pond { --c-ink: #e8efe4; background: radial-gradient(90% 70% at 60% 35%, #1d4a42 0%, #0a1f1d 85%); }
+    .pond .pad {
+      position: absolute; width: 74px; aspect-ratio: 1; border-radius: 50%;
+      background: conic-gradient(from 20deg, transparent 0 22deg, #5f8a4e 22deg 360deg);
+      -webkit-mask: radial-gradient(circle, #000 69%, transparent 70%); mask: radial-gradient(circle, #000 69%, transparent 70%);
+      filter: drop-shadow(3px 5px 4px rgba(2, 12, 10, 0.5));
     }
-    .cairn .stack i:nth-child(1) { width: 64px; height: 22px; }
-    .cairn .stack i:nth-child(2) { width: 50px; height: 19px; background: linear-gradient(180deg, #d4ccbd, #a49e93 60%, #6e6a62); }
-    .cairn .stack i:nth-child(3) { width: 38px; height: 15px; }
-    .cairn .stack i:nth-child(4) { width: 27px; height: 12px; background: linear-gradient(180deg, #bdbab0, #74736d 60%, #4f4e4a); }
-    .cairn .stack i:nth-child(5) { width: 18px; height: 9px; animation: fadeTop 5s ease-in-out infinite; }
-    @keyframes fadeTop { 50% { opacity: 0.25; filter: brightness(1.4); } }
-    @keyframes settle { 50% { transform: translateY(0.5px); } }
+    .pond .pad:nth-of-type(1) { left: 58%; top: 10%; }
+    .pond .pad:nth-of-type(2) { left: 80%; top: 34%; width: 54px; transform: rotate(140deg); }
+    .pond .pad:nth-of-type(3) { left: 8%; top: 8%; width: 60px; transform: rotate(250deg); }
+    .pond .lotus {
+      position: absolute; left: calc(58% + 25px); top: calc(10% + 25px); width: 24px; height: 24px; border-radius: 50%;
+      background: radial-gradient(circle, #f2cf63 0 18%, #fbeef0 20% 52%, #efc1cb 54% 100%);
+      box-shadow: 0 0 0 3px rgba(239, 193, 203, 0.55);
+    }
+    .pond .swim { position: absolute; left: 50%; top: 32%; width: 0; height: 0; animation: swim 26s linear infinite; }
+    .pond .koi {
+      position: absolute; left: 64px; top: -6px; width: 52px; height: 13px; border-radius: 50% 60% 60% 50% / 50%;
+      background: radial-gradient(circle at 30% 50%, #e2662c 0 22%, transparent 24%), radial-gradient(circle at 70% 50%, #e2662c 0 16%, transparent 18%), #f3ede4;
+      transform: rotate(90deg);
+      box-shadow: 6px 8px 6px rgba(2, 12, 10, 0.35);
+    }
+    @keyframes swim { to { transform: rotate(360deg); } }
 
     footer { margin: 26px auto 0; max-width: 520px; text-align: center; font-size: 12.5px; line-height: 1.7; color: var(--ink-faint); }
 
@@ -141,10 +155,10 @@
   </header>
 
   <nav class="designs" aria-label="Designs">
-    <a class="card still" href="still/">
-      <div class="art" aria-hidden="true"><span class="stone"></span></div>
-      <h2>Still</h2>
-      <p>A candlelit pool at night. Steam drifts and every breath sends a ripple across the water.</p>
+    <a class="card orbit" href="orbit/">
+      <div class="art" aria-hidden="true"><span class="stars"></span><span class="stone"></span></div>
+      <h2>Orbit</h2>
+      <p>A quiet patch of deep space. Stars glimmer and every breath sends a ripple out through the dark.</p>
       <span class="how">Turn the stone around the dial</span>
     </a>
     <a class="card ember" href="ember/">
@@ -153,11 +167,11 @@
       <p>A single stick of incense in a warm, dark room. It burns down as you rest, smoke curling into the light.</p>
       <span class="how">Drag the incense to its length</span>
     </a>
-    <a class="card cairn" href="cairn/">
-      <div class="art" aria-hidden="true"><span class="sun"></span><span class="stack"><i></i><i></i><i></i><i></i><i></i></span></div>
-      <h2>Cairn</h2>
-      <p>Morning at a still lake. Stack a stone for every five minutes and watch them return to light.</p>
-      <span class="how">Tap to place each stone</span>
+    <a class="card pond" href="pond/">
+      <div class="art" aria-hidden="true"><span class="pad"></span><span class="pad"></span><span class="pad"></span><span class="lotus"></span><span class="swim"><i class="koi"></i></span></div>
+      <h2>Pond</h2>
+      <p>A koi pond seen from above. Lily pads drift, the fish circle, and every breath sends a ring across the water.</p>
+      <span class="how">Tap to add five minutes</span>
     </a>
   </nav>
 

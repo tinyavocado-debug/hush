@@ -1,25 +1,23 @@
-/* Still: a candlelit pool at night. */
+/* Orbit: a quiet patch of deep space, a violet glow on near-black. */
 :root {
-  --bg: #0b201f;
+  --bg: #030209;
   --ink: #eadfcb;
   --accent: #efe5d3;
   --accent-2: #bfb096;
-  --accent-ink: #0d2523;
+  --accent-ink: #030209;
   --glow: rgba(242, 197, 138, 0.3);
   --dial: min(78vw, 42vh, 340px);
 }
 @supports (height: 1dvh) { :root { --dial: min(78vw, 42dvh, 340px); } }
 
 body {
-  background:
-    radial-gradient(120% 70% at 50% 115%, #2c4c42 0%, rgba(20, 51, 49, 0) 60%),
-    radial-gradient(90% 60% at 50% 40%, #153533 0%, #0b201f 75%);
-  background-color: #0b201f;
+  background: radial-gradient(80% 46% at 50% 42%, #3d22a8 0%, #1a0f58 34%, #07051a 62%, #020106 85%);
+  background-color: #020106;
 }
 
 .dusk {
   position: fixed; inset: 0; pointer-events: none;
-  background: #040e0e;
+  background: #020109;
   opacity: 0;
   transition: opacity 4s ease;
 }
@@ -117,7 +115,7 @@ body[data-phase="session"] .dusk { opacity: 0.38; }
   display: grid;
   place-items: center;
 }
-/* A soft-focus sphere in Cairn's stone tones. Its edge blurs in and out with the
+/* A soft-focus sphere in stone tones. Its edge blurs in and out with the
    breath (--k: 0 fully out, 1 fully in), and a film grain sits on top, unblurred. */
 .orb, .orb-grain {
   position: absolute;
@@ -143,8 +141,8 @@ body[data-phase="session"] .dusk { opacity: 0.38; }
   -webkit-mask-image: radial-gradient(circle closest-side, #000 82%, transparent 100%);
   mask-image: radial-gradient(circle closest-side, #000 82%, transparent 100%);
 }
-/* With WebGL, the dot-sphere canvas (still.js) replaces the CSS sphere above. It is 1.6x the
-   ring box (SHELL_SCALE in still.js), so the sphere can swell past the timer ring. */
+/* With WebGL, the dot-sphere canvas (orbit.js) replaces the CSS sphere above. It is 1.6x the
+   ring box (SHELL_SCALE in orbit.js), so the sphere can swell past the timer ring. */
 .shell { position: absolute; left: -30%; top: -30%; width: 160%; height: 160%; pointer-events: none; }
 .orb-wrap.gl .orb, .orb-wrap.gl .orb-grain { display: none; }
 .ring { position: absolute; inset: 0; width: 100%; height: 100%; }

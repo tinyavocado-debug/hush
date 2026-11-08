@@ -28,8 +28,10 @@
   }));
   const smoke = [[], []];
   const flakes = [];
-  let emitAcc = 0, ashLen = 0, ashMax = 8, flare = 0, crackleBoost = 0;
+  let emitAcc = 0, ashLen = 0, flare = 0, crackleBoost = 0;
   let focus = 0, shownMin = 30, lit = false;
+  let lastStage = '';
+  const sparks = []; // a few sparks rise from the tip as each breath in starts
 
   function resize() {
     const dpr = Math.min(2, devicePixelRatio || 1);
@@ -91,9 +93,10 @@
     // An unseen hearth, warming the room when chosen.
     if (s.phase === 'session' && app.state.sound === 'hearth') {
       crackleBoost *= 0.9;
-      const fl = 0.8 + 0.1 * Math.sin(t * 3.1) + 0.07 * Math.sin(t * 7.3) + crackleBoost;
-      const r = Math.max(W, H) * 0.75;
-      g.globalAlpha = 0.14 * fl * focus;
+      // Rises with the roar on each in-breath.
+      const fl = 0.85 + 0.05 * Math.sin(t * 3.1) + 0.04 * Math.sin(t * 7.3) + crackleBoost;
+      const r = Math.max(W, H) * 0.75, k = s.breath?.k ?? 0;
+      g.globalAlpha = (0.08 + 0.1 * k) * fl * focus;
       g.drawImage(warmS, -W * 0.25 - r, H * 1.05 - r, r * 2, r * 2);
     }
     g.globalAlpha = 1;
@@ -149,11 +152,12 @@
         g.fillRect(x - 2.6, tipY - ashLen, 5.2, ashLen);
       }
       g.globalCompositeOperation = 'lighter';
-      const r1 = (14 + 8 * breath + flare * 40) * fl * dim;
+      // The tip brightens and its halo widens on the in-breath, as the sound swells.
+      const r1 = (12 + 14 * breath + crackleBoost * 8 + flare * 40) * fl * dim;
       g.globalAlpha = 0.9 * dim;
       g.drawImage(emberS, x - r1, tipY - r1, r1 * 2, r1 * 2);
-      const r2 = (90 + 30 * breath + flare * 140) * dim;
-      g.globalAlpha = 0.12 * fl;
+      const r2 = (75 + 80 * breath + flare * 140) * dim;
+      g.globalAlpha = (0.07 + 0.1 * breath) * fl;
       g.drawImage(warmS, x - r2, tipY - r2, r2 * 2, r2 * 2);
       g.globalAlpha = 1;
       g.fillStyle = `rgba(255,${170 + 50 * breath},${90 + 40 * breath},${0.95 * dim})`;
@@ -179,6 +183,34 @@
     g.beginPath(); g.ellipse(x - 8, base, 22, 2.6, 0, 0, TAU); g.fill();
 
     return { x, y: tipY - ashLen };
+  }
+
+  // Sparks as each breath in starts, with the drone's high chime.
+  function spark(tip) {
+    for (let i = 0, n = 6 + Math.floor(Math.random() * 4); i < n; i++) {
+      sparks.push({ x: tip.x, y: tip.y, vx: (Math.random() - 0.5) * 50, vy: -70 - Math.random() * 90, age: 0, life: 1.2 + Math.random() * 1.4 });
+    }
+  }
+
+  function updateSparks(dt) {
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const p = sparks[i];
+      p.age += dt; p.vy *= Math.pow(0.4, dt); p.vx *= Math.pow(0.5, dt);
+      p.x += (p.vx + Math.sin(p.age * 9 + i) * 12) * dt; p.y += p.vy * dt;
+      if (p.age > p.life) sparks.splice(i, 1);
+    }
+  }
+
+  function drawSparks() {
+    g.globalCompositeOperation = 'lighter';
+    for (const p of sparks) {
+      g.globalAlpha = Math.pow(1 - p.age / p.life, 1.3);
+      g.drawImage(emberS, p.x - 7, p.y - 7, 14, 14);
+      g.fillStyle = 'rgba(255,214,150,0.9)';
+      g.fillRect(p.x - 0.8, p.y - 0.8, 1.6, 1.6);
+    }
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'source-over';
   }
 
   function updateSmoke(dt, t, tip, emit, wind) {
@@ -230,13 +262,19 @@
     if (s.phase === 'session') { coated = s.remaining / 60000; total = s.total / 60000; }
     else if (s.phase === 'complete') { coated = 0; total = app.minutes; }
 
-    // Ash grows from the burning tip and now and then drops into the dish.
+    // The turn of each breath: sparks as the breath in starts (below, once the tip is drawn),
+    // and the ash drops as the breath out starts, so the smoke gives its small jump.
+    const stage = s.phase === 'session' && !s.opening && s.breath ? s.breath.stage : '';
+    const turned = stage !== lastStage && lit && focus > 0.95 && !s.paused ? stage : '';
+    lastStage = stage;
+
+    // Ash grows from the burning tip and drops into the dish with each breath out.
     if (lit && s.phase === 'session' && !s.paused) {
       ashLen += dt * 0.6;
-      if (ashLen > ashMax) {
+      if (turned === 'out' && ashLen > 1) {
         const tipY = geo.base - BAMBOO - coated * geo.ppm;
         flakes.push({ x: geo.x, y: tipY - ashLen / 2, vy: 0, vx: (Math.random() - 0.5) * 20, a: 0.9 });
-        ashLen = 0; ashMax = 5 + Math.random() * 8;
+        ashLen = 0;
       }
     }
     for (let i = flakes.length - 1; i >= 0; i--) {
@@ -253,8 +291,11 @@
 
     const emitting = lit && s.phase === 'session' && focus > 0.95 && (!s.paused || Math.random() < 0.3);
     const wind = s.breath ? (s.breath.k - 0.5) * 4 : 0;
+    if (turned === 'in') spark(tip);
     updateSmoke(dt, t, tip, emitting, wind);
+    updateSparks(dt);
     drawSmoke();
+    drawSparks();
   }
 
   /* ───────── setup gesture ───────── */
@@ -299,12 +340,12 @@
 
   const app = Spa.createApp({
     key: 'ember', title: 'Ember · Hush', short: 'Ember',
-    min: 5, max: MAX, defaultMinutes: 30, defaultSound: 'temple',
+    min: 5, max: MAX, defaultMinutes: 30,
     sounds: ['temple', 'hearth', 'silence'],
     bell: { f0: 174.6, vol: 0.5 },
     render,
     onStep: (m) => Spa.audio.tick(0.75 + m / 200),
-    onBegin() { lit = true; flare = 1; ashLen = 0; smoke[0].length = 0; smoke[1].length = 0; },
+    onBegin() { lit = true; flare = 1; ashLen = 0; smoke[0].length = 0; smoke[1].length = 0; sparks.length = 0; },
     onComplete() { lit = false; flare = 0; },
     onPhase(p) { if (p === 'setup') { lit = false; flakes.length = 0; } },
     frame,

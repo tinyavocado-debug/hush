@@ -1,4 +1,4 @@
-/* Still: turn the stone around the pool, breathe with the ripples. */
+/* Orbit: turn the stone around the dial, breathe with the ripples among the stars. */
 (function () {
   'use strict';
   const { clamp, reducedMotion } = Spa;
@@ -6,11 +6,11 @@
   const TAU = Math.PI * 2;
   const R = 118, DIAL_C = TAU * R, MAX = 180;
 
-  /* ───────── canvas scene: caustics, candle glow, steam, ripples ───────── */
+  /* ───────── canvas scene: drifting violet light, stars, a low blue glow, haze, ripples ───────── */
   const scene = (() => {
     const cv = $('#scene'), g = cv.getContext('2d');
     let W = 0, H = 0, focus = 0, focusTarget = 0;
-    const steam = [], ripples = [];
+    const steam = [], ripples = [], stars = [];
 
     function sprite(r, gg, b) {
       const c = document.createElement('canvas'), s = 128;
@@ -22,7 +22,7 @@
       x.fillStyle = gr; x.fillRect(0, 0, s, s);
       return c;
     }
-    const steamS = sprite(255, 244, 228), causticS = sprite(120, 196, 182), candleS = sprite(242, 176, 104);
+    const steamS = sprite(255, 244, 228), causticS = sprite(80, 70, 220), candleS = sprite(40, 70, 200);
 
     function makeSteam(initial) {
       const s = Math.max(W, H), maxLife = 16 + Math.random() * 18;
@@ -42,6 +42,12 @@
       const n = Math.round(clamp((W * H) / 14000, 16, 40) * (reducedMotion ? 0.5 : 1));
       while (steam.length < n) steam.push(makeSteam(true));
       steam.length = n;
+      // A still field of stars, each glimmering at its own pace.
+      stars.length = 0;
+      for (let i = 0, m = Math.round(clamp((W * H) / 5000, 60, 260)); i < m; i++) {
+        stars.push({ x: Math.random() * W, y: Math.random() * H, r: 0.4 + Math.pow(Math.random(), 4) * 1.3,
+          a: 0.25 + Math.random() * 0.65, ph: Math.random() * TAU, sp: 0.4 + Math.random() * 1.2 });
+      }
     }
 
     function ripple(x, y, o = {}) {
@@ -67,6 +73,12 @@
         g.drawImage(causticS, x - r, y - r, r * 2, r * 2);
       }
 
+      g.fillStyle = '#fff';
+      for (const st of stars) {
+        g.globalAlpha = st.a * (reducedMotion ? 1 : 0.7 + 0.3 * Math.sin(t * st.sp + st.ph));
+        g.beginPath(); g.arc(st.x, st.y, st.r, 0, TAU); g.fill();
+      }
+
       const flick = 0.85 + 0.08 * Math.sin(t * 2.3) + 0.05 * Math.sin(t * 5.7 + 1.3) + 0.03 * Math.sin(t * 11.1);
       const cr = big * 0.55;
       g.globalAlpha = 0.16 * flick;
@@ -79,7 +91,7 @@
         p.r += dt * 2;
         if (p.life > p.maxLife || p.y < -p.r) Object.assign(p, makeSteam(false));
         const k = Math.sin(Math.PI * Math.min(1, p.life / p.maxLife));
-        g.globalAlpha = p.a * k * (1 + 0.4 * focus);
+        g.globalAlpha = p.a * k * (1 + 0.4 * focus) * 0.25; // only a faint haze in space
         const sx = Math.sin(t * 0.2 + p.ph) * p.sway;
         g.drawImage(steamS, p.x + sx - p.r, p.y - p.r, p.r * 2, p.r * 2);
       }
@@ -201,7 +213,7 @@
      warm rim, turning slowly while a brighter swell drifts across its surface. It is in focus
      only at the turn of each breath, at its largest and smallest; while it grows and shrinks
      it drifts out of focus, the dots softening into a haze. Without WebGL the CSS .orb stays. */
-  const SHELL_SCALE = 1.6; // canvas size relative to .orb-wrap; keep in step with .shell in still.css
+  const SHELL_SCALE = 1.6; // canvas size relative to .orb-wrap; keep in step with .shell in orbit.css
   const shell = (() => {
     const cv = document.createElement('canvas');
     cv.className = 'shell';
@@ -330,8 +342,8 @@
   };
 
   const app = Spa.createApp({
-    key: 'still', title: 'Still · Hush', short: 'Still',
-    min: 5, max: MAX, defaultMinutes: 30, defaultSound: 'ocean',
+    key: 'still', title: 'Orbit · Hush', short: 'Orbit', // key kept from Still, so saved lengths carry over
+    min: 5, max: MAX, defaultMinutes: 30,
     sounds: ['ocean', 'rain', 'silence'],
     bell: { f0: 196, vol: 0.5 },
     render,
