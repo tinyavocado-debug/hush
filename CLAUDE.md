@@ -2,7 +2,7 @@
 
 - **Start:** `python3 -m http.server 8766` from the repo root (no build step)
 - **Port:** 8766
-- **Main URL:** http://localhost:8766/ (rooms: `/orbit/`, `/ember/`, `/pond/`; `/still/` and `/cairn/` redirect to their new names)
+- **Main URL:** http://localhost:8766/ (rooms: `/orbit/`, `/ember/`, `/pond/`)
 
 ## Names
 
