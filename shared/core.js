@@ -9,24 +9,69 @@
   Spa.ease = (t) => 0.5 - 0.5 * Math.cos(Math.PI * clamp(t, 0, 1));
   Spa.reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Breath pattern: a pace sets how long each breath in and out lasts, and an optional hold
-  // pauses after each (in, hold, out, hold). Changed from the session controls.
+  // Breathing techniques, picked from the breath menu. `t` is seconds for each stage:
+  // in, hold after in, out, hold after out. `say` renames a stage's word (in, out, hold);
+  // `parts` splits the breath in into named sections, as three-part breathing does.
+  Spa.TECHNIQUES = [
+    { id: 'balance', word: 'Balance', name: 'Sama Vritti', sub: 'Equal breathing', t: [4, 0, 4, 0],
+      note: 'Builds a consistent breathing rhythm. Useful for centering yourself before work, yoga, or meditation.' },
+    { id: 'recovery', word: 'Recovery', name: 'Visama Vritti', sub: 'Extended exhale', t: [4, 0, 8, 0],
+      note: 'Traditionally used for settling the mind and reducing agitation. A gentler starting pattern is 4–6.' },
+    { id: 'concentration', word: 'Concentration', name: 'Antara Kumbhaka', sub: 'Inhale retention', t: [4, 2, 4, 0],
+      note: 'Introduces a pause after inhaling. Traditionally used to cultivate attention, steadiness, and control over the breath.' },
+    { id: 'stillness', word: 'Stillness', name: 'Bahya Kumbhaka', sub: 'Exhale retention', t: [4, 0, 4, 2],
+      note: 'Emphasizes the quiet pause after exhalation. Used to explore mental stillness and awareness of the urge to breathe.' },
+    { id: 'discipline', word: 'Discipline', name: 'Sama Vritti', sub: 'With retention', t: [4, 4, 4, 4],
+      note: 'The four-phase equal pattern commonly called box breathing. Useful for maintaining a deliberate rhythm under mental pressure.' },
+    { id: 'control', word: 'Control', name: 'Visama Vritti', sub: 'Graduated retention', t: [4, 2, 6, 0],
+      note: 'A mixed ratio that integrates inhalation retention with a longer exhale. A useful intermediate practice for learning measured breath control.' },
+    { id: 'advanced', word: 'Advanced', name: 'Classical 1:4:2 ratio', sub: '', t: [4, 16, 8, 0],
+      note: 'A traditional pranayama ratio associated with deeper concentration and mastery of retention. Not a beginner exercise; the long retention should be learned with qualified instruction.' },
+    { id: 'alertness', word: 'Alertness', name: 'Visama Vritti', sub: 'Extended inhale', t: [6, 0, 4, 0],
+      note: 'An inhale-emphasized variation sometimes used for a more activating experience. Evidence for a reliable alertness boost is limited.' },
+    { id: 'body', word: 'Body', name: 'Three-part breathing', sub: 'Progressive', t: [6, 0, 6, 0], parts: ['belly', 'ribs', 'chest'],
+      note: 'Inspired by Dirga Pranayama. The inhale is divided into three continuous expansions, followed by one smooth exhale. Useful for practicing respiratory coordination.' },
+    { id: 'movement', word: 'Movement', name: 'Ujjayi', sub: 'Timed ocean breath', t: [5, 0, 5, 0],
+      note: 'Uses a gentle throat narrowing to create an ocean-like sound. Can help coordinate breath with physical movement and sustained attention.' },
+    { id: 'senses', word: 'Senses', name: 'Bhramari', sub: 'Humming exhale', t: [4, 0, 8, 0], say: { out: 'hum' },
+      note: 'The extended humming exhale provides vibration and an auditory anchor. Traditionally used for inward attention and quieting mental chatter.' },
+    { id: 'activating', word: 'Activating', name: 'Bhastrika', sub: 'Bellows breathing', t: [1, 0, 1, 0], say: { in: 'in', out: 'out' },
+      note: '' },
+  ];
+  Spa.technique = (id) => Spa.TECHNIQUES.find((x) => x.id === id) || null;
+  // Your own pace: how long each breath in and out lasts, and an optional hold after each.
   Spa.PACES = {
     short: { label: 'Short', inhale: 3000, exhale: 5000, hold: 2000 },
     steady: { label: 'Steady', inhale: 4000, exhale: 6000, hold: 3000 },
     long: { label: 'Long', inhale: 5000, exhale: 8000, hold: 4000 },
   };
-  Spa.setPattern = (pace, hold) => {
-    if (!Spa.PACES[pace]) pace = 'steady';
-    hold = !!hold;
-    const P = Spa.PACES[pace], h = hold ? P.hold : 0;
-    Spa.pattern = Object.freeze({
-      pace, hold, inhale: P.inhale, holdIn: h, exhale: P.exhale, holdOut: h,
-      cycle: P.inhale + h + P.exhale + h,
-    });
+  // Choose a pace (short, steady, long) with or without a hold, or a technique by its id.
+  // `pace` is set only for your own pace; `id` is the pace or technique.
+  Spa.setPattern = (id, hold) => {
+    const T = Spa.technique(id);
+    let t, pace = null, say = {}, parts = null;
+    if (T) { t = T.t.map((x) => x * 1000); say = T.say || {}; parts = T.parts || null; hold = false; }
+    else {
+      pace = Spa.PACES[id] ? id : 'steady'; // an unknown saved choice goes back to Steady
+      id = pace; hold = !!hold;
+      const P = Spa.PACES[pace], h = hold ? P.hold : 0;
+      t = [P.inhale, h, P.exhale, h];
+    }
+    const [inhale, holdIn, exhale, holdOut] = t;
+    Spa.pattern = Object.freeze({ id, pace, hold, inhale, holdIn, exhale, holdOut, cycle: inhale + holdIn + exhale + holdOut, say, parts });
     return Spa.pattern;
   };
-  Spa.setPattern('steady', false);
+  // A pattern's counts in seconds, e.g. "4 in · 2 hold · 4 out", or "2 belly · 2 ribs · 2 chest · 6 out".
+  Spa.patternCounts = (P) => {
+    const sec = (ms) => +(ms / 1000).toFixed(1), out = [];
+    if (P.parts) P.parts.forEach((x) => out.push(`${sec(P.inhale / P.parts.length)} ${x}`));
+    else out.push(`${sec(P.inhale)} ${P.say.in || 'in'}`);
+    if (P.holdIn) out.push(`${sec(P.holdIn)} hold`);
+    out.push(`${sec(P.exhale)} ${P.say.out || 'out'}`);
+    if (P.holdOut) out.push(`${sec(P.holdOut)} hold`);
+    return out.join(' · ');
+  };
+  Spa.setPattern('steady'); // the app restores the last choice
 
   const GUIDE_CYCLES = 6; // breathing words fade away after the first few breaths
   // Every session opens with a brief stillness, then one breath in shown large across the
@@ -34,6 +79,12 @@
   const SETTLE = (Spa.SETTLE = 1500);
   const AT_REST = Object.freeze({ cycle: -1, p: 0, stage: 'in', f: 0, inhale: true, k: 0 });
   const STAGE_WORDS = { in: 'breathe in', 'hold-in': 'hold', out: 'breathe out', 'hold-out': 'hold' };
+  // The word for where a breath stands, following the technique's own words.
+  const stageWord = (b, P) => {
+    if (b.stage === 'in' && P.parts) return P.parts[Math.min(P.parts.length - 1, Math.floor(b.f * P.parts.length))];
+    const k = b.stage === 'in' ? 'in' : b.stage === 'out' ? 'out' : 'hold';
+    return P.say[k] || STAGE_WORDS[b.stage];
+  };
 
   Spa.AFTERCARE = [
     'Take a slow sip of water before you rise.',
@@ -487,29 +538,173 @@
     openingEl.textContent = 'breathe in';
     $('.session').appendChild(openingEl);
 
-    // Breath pace and hold. Every session starts Steady with no hold; both can be changed
-    // from the session controls, and a change starts with the next breath.
-    const breathOpts = document.createElement('div');
-    breathOpts.className = 'session-breath';
-    breathOpts.innerHTML = `
-      <div class="paces" role="radiogroup" aria-label="Breath pace">
-        ${Object.entries(Spa.PACES).map(([k, v]) => `<button type="button" role="radio" data-pace="${k}">${v.label}</button>`).join('')}
-      </div>
-      <button type="button" class="hold-toggle" aria-pressed="false">Hold</button>`;
-    $('.session .controls').before(breathOpts);
-    breathOpts.querySelectorAll('[data-pace]').forEach((b) =>
-      b.addEventListener('click', () => setBreath(b.dataset.pace, Spa.pattern.hold)));
-    breathOpts.querySelector('.hold-toggle').addEventListener('click', () => setBreath(Spa.pattern.pace, !Spa.pattern.hold));
+    // The breath menu, opened from a button at the top right (on the setup screen, and with the
+    // session controls). It holds your own pace (Short / Steady / Long, and Hold) and the
+    // breathing techniques; a change mid-session starts with the next breath.
+    // Holding a technique draws an outline round it and makes it a favorite, which moves it to
+    // the top; holding a favorite again unwinds the outline.
+    const prefs = Spa.store('breath'); // shared by every room
+    let favs = prefs.get('favorites', []).filter((id) => Spa.technique(id));
+    let lastPace = Spa.PACES[prefs.get('pace')] ? prefs.get('pace') : 'steady'; // your own pace, kept while a technique is chosen
+    let lastHold = !!prefs.get('hold', false);
+    Spa.setPattern(prefs.get('choice', lastPace), lastHold);
+
+    const opener = document.createElement('button');
+    opener.type = 'button';
+    opener.className = 'breath-open';
+    opener.setAttribute('aria-haspopup', 'dialog');
+    opener.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9c2.5-2.5 5.5-2.5 8 0s5.5 2.5 8 0"/><path d="M4 15c2.5-2.5 5.5-2.5 8 0s5.5 2.5 8 0"/></svg><span class="breath-open-word"></span>`;
+    main.appendChild(opener);
+
+    const menu = document.createElement('div');
+    menu.className = 'bmenu';
+    menu.setAttribute('role', 'dialog');
+    menu.setAttribute('aria-modal', 'true');
+    menu.setAttribute('aria-label', 'Breath');
+    menu.innerHTML = `
+      <div class="bmenu-panel">
+        <p class="eyebrow">Your own pace</p>
+        <div class="bmenu-own">
+          <div class="paces" role="radiogroup" aria-label="Pace">
+            ${Object.entries(Spa.PACES).map(([k, v]) => `<button type="button" role="radio" data-pace="${k}">${v.label}</button>`).join('')}
+          </div>
+          <button type="button" class="hold-toggle" aria-pressed="false">Hold</button>
+        </div>
+        <p class="eyebrow bmenu-or">Or breathe for</p>
+        <div class="bmenu-grid" role="radiogroup" aria-label="Technique">
+          ${Spa.TECHNIQUES.map((T) => `<button type="button" role="radio" data-tech="${T.id}">
+            <svg class="bmenu-ring" aria-hidden="true"><rect pathLength="100"/></svg><span>${T.word}</span></button>`).join('')}
+        </div>
+        <p class="bmenu-tip">Hold one to make it a favorite</p>
+        <div class="bmenu-about" aria-live="polite">
+          <p class="bmenu-name"></p><p class="bmenu-counts"></p><p class="bmenu-note"></p>
+        </div>
+        <button type="button" class="ghost bmenu-done">Done</button>
+      </div>`;
+    document.body.appendChild(menu);
+    const grid = menu.querySelector('.bmenu-grid');
+    const techBtn = Object.fromEntries([...grid.children].map((b) => [b.dataset.tech, b]));
+    menu.querySelectorAll('[data-pace]').forEach((b) => b.addEventListener('click', () => {
+      setBreath(b.dataset.pace, Spa.pattern.pace ? Spa.pattern.hold : lastHold);
+      audio.ensure(); audio.tick(1.2);
+    }));
+    // Hold toggles the hold on your own pace; from a technique, it goes to your pace with a hold.
+    menu.querySelector('.hold-toggle').addEventListener('click', () => {
+      setBreath(lastPace, Spa.pattern.pace ? !Spa.pattern.hold : true);
+      audio.ensure(); audio.tick(1.2);
+    });
+
+    function openMenu() {
+      menu.classList.add('open');
+      sizeRings();
+      menu.querySelector('[aria-checked="true"]')?.focus({ preventScroll: true });
+    }
+    function closeMenu() { menu.classList.remove('open'); opener.focus({ preventScroll: true }); }
+    opener.addEventListener('click', openMenu);
+    menu.querySelector('.bmenu-done').addEventListener('click', closeMenu);
+    menu.addEventListener('click', (e) => { if (e.target === menu) closeMenu(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menu.classList.contains('open')) closeMenu(); });
+
+    // Every button is the same size; fit the outline to it (a pill, so the corners are half its height).
+    function sizeRings() {
+      const b = grid.firstElementChild, w = b.offsetWidth, h = b.offsetHeight;
+      if (!w) return;
+      Object.values(techBtn).forEach((x) => {
+        const r = x.querySelector('rect');
+        r.setAttribute('x', 0.75); r.setAttribute('y', 0.75);
+        r.setAttribute('width', w - 1.5); r.setAttribute('height', h - 1.5);
+        r.setAttribute('rx', (h - 1.5) / 2);
+      });
+    }
+    addEventListener('resize', sizeRings);
+
+    // Favorites first, newest at the top, then the rest in their usual order.
+    // FLIP: note where each button was, reorder, then glide each one from there.
+    function arrange(animate) {
+      const ids = [...favs, ...Spa.TECHNIQUES.map((x) => x.id).filter((id) => !favs.includes(id))];
+      const btns = ids.map((id) => techBtn[id]);
+      const was = animate && !Spa.reducedMotion ? new Map(btns.map((b) => [b, b.getBoundingClientRect()])) : null;
+      btns.forEach((b) => { grid.appendChild(b); b.classList.toggle('fav', favs.includes(b.dataset.tech)); });
+      if (!was) return;
+      const moved = btns.filter((b) => {
+        const a = was.get(b), z = b.getBoundingClientRect(), dx = a.left - z.left, dy = a.top - z.top;
+        if (!dx && !dy) return false;
+        b.style.transition = 'none';
+        b.style.transform = `translate(${dx}px, ${dy}px)`;
+        return true;
+      });
+      void grid.offsetWidth;
+      moved.forEach((b) => {
+        b.style.transition = 'transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1)';
+        b.style.transform = '';
+        setTimeout(() => { b.style.transition = ''; }, 750);
+      });
+    }
+
+    function toggleFav(id) {
+      favs = favs.includes(id) ? favs.filter((x) => x !== id) : [id, ...favs];
+      prefs.set('favorites', favs);
+      audio.tick(favs.includes(id) ? 1.5 : 0.8);
+      vibrate(12);
+      arrange(true);
+    }
+
+    const HOLD_MS = 800;
+    let press = null, swallowClick = false;
+    function endPress() {
+      if (!press) return;
+      clearTimeout(press.t);
+      press.b.classList.remove('winding', 'unwinding');
+      press = null;
+    }
+    grid.addEventListener('pointerdown', (e) => {
+      const b = e.target.closest('[data-tech]');
+      if (!b || e.button > 0) return;
+      endPress();
+      swallowClick = false;
+      press = { b, x: e.clientX, y: e.clientY };
+      b.classList.add(b.classList.contains('fav') ? 'unwinding' : 'winding');
+      press.t = setTimeout(() => {
+        const id = b.dataset.tech;
+        endPress();
+        swallowClick = true; // the release that follows is not a tap
+        toggleFav(id);
+      }, HOLD_MS);
+    });
+    grid.addEventListener('pointermove', (e) => {
+      if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 12) endPress();
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => grid.addEventListener(t, endPress));
+    grid.addEventListener('contextmenu', (e) => e.preventDefault());
+    grid.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-tech]');
+      if (!b) return;
+      if (swallowClick) { swallowClick = false; return; }
+      setBreath(b.dataset.tech);
+      audio.ensure(); audio.tick(1.2);
+    });
+
     function renderBreath() {
+      const P = Spa.pattern, T = Spa.technique(P.id);
+      opener.querySelector('.breath-open-word').textContent = T ? T.word : `${Spa.PACES[P.pace].label}${P.hold ? ' · Hold' : ''}`;
+      opener.setAttribute('aria-label', `Breath: ${opener.textContent}`);
+      menu.querySelectorAll('[data-pace]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.pace === P.pace)));
+      menu.querySelector('.hold-toggle').setAttribute('aria-pressed', String(!!P.pace && P.hold));
+      Object.values(techBtn).forEach((b) => b.setAttribute('aria-checked', String(b.dataset.tech === P.id)));
+      menu.querySelector('.bmenu-name').textContent = T ? (T.sub ? `${T.name} — ${T.sub}` : T.name) : `Your own pace — ${Spa.PACES[P.pace].label}`;
+      menu.querySelector('.bmenu-counts').textContent = Spa.patternCounts(P);
+      menu.querySelector('.bmenu-note').textContent = T ? T.note : '';
+    }
+    function setBreath(id, hold) {
+      Spa.setPattern(id, hold);
       const P = Spa.pattern;
-      breathOpts.querySelectorAll('[data-pace]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.pace === P.pace)));
-      breathOpts.querySelector('.hold-toggle').setAttribute('aria-pressed', String(P.hold));
-    }
-    function setBreath(pace, hold) {
-      Spa.setPattern(pace, hold);
+      if (P.pace) { lastPace = P.pace; lastHold = P.hold; prefs.set('pace', lastPace); prefs.set('hold', lastHold); }
+      prefs.set('choice', P.id);
       renderBreath();
-      st.bChange = Math.floor(Math.max(0, st.bLocal) / st.bPat.cycle); // switch once this breath ends
+      if (st.phase === 'session') st.bChange = Math.floor(Math.max(0, st.bLocal) / st.bPat.cycle); // switch once this breath ends
     }
+    arrange(false);
+    renderBreath();
 
     // The session's breath clock. It runs on the pattern it began with until a new one is
     // chosen; then, as the current breath ends, it picks up the new pattern from there.
@@ -577,7 +772,6 @@
       // The session runs the settle, the opening inhale (and its hold) and the timer;
       // st.remaining counts down the whole span.
       st.total = st.minutes * 60000;
-      Spa.setPattern('steady', false);
       renderBreath();
       st.span = st.total + SETTLE + Spa.pattern.inhale + Spa.pattern.holdIn;
       st.bPat = Spa.pattern; st.bOrigin = 0; st.bOffset = 0; st.bChange = -1; st.bLocal = 0;
@@ -660,12 +854,12 @@
       main.classList.toggle('muted', st.muted);
     });
     $('.session').addEventListener('click', (e) => {
-      if (e.target.closest('button, .session-breath')) { showControls(st.paused); return; }
+      if (e.target.closest('button')) { showControls(st.paused); return; }
       if (main.classList.contains('show-controls') && !st.paused) main.classList.remove('show-controls');
       else showControls();
     });
     document.addEventListener('keydown', (e) => {
-      if (st.phase === 'session' && e.code === 'Space') { e.preventDefault(); togglePause(); }
+      if (st.phase === 'session' && e.code === 'Space' && !menu.classList.contains('open')) { e.preventDefault(); togglePause(); }
     });
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && st.phase === 'session' && !st.paused) Spa.wake.on();
@@ -724,7 +918,7 @@
           cfg.onBreath?.(breath);
         }
         // During the opening breath the large "breathe in" speaks instead of the small label.
-        const label = st.paused ? 'paused' : opening ? '' : STAGE_WORDS[breath.stage];
+        const label = st.paused ? 'paused' : opening ? '' : stageWord(breath, st.bPat);
         setLabel(label, st.paused || (!opening && breath.cycle < st.guideUntil));
         info = { phase: 'session', minutes: st.minutes, total: st.total, remaining: left, elapsed, progress: elapsed / st.total, paused: st.paused, opening, breath };
         if (st.remaining <= 0 && !st.paused) complete(false);
