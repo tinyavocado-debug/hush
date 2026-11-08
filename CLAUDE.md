@@ -7,7 +7,7 @@
 ## Names
 
 - **Hush**: the app. A room picker, then one room per scene.
-- **Orbit** (was Still): deep space and the breathing dot sphere. Sounds: Float, Comet, Silence (`ocean` and `rain` in code).
+- **Orbit** (was Still): deep space and the breathing dot sphere. Sounds: Float, Voyage, Silence (`ocean` and `rain` in code).
 - **Ember**: incense stick that burns down. Sounds: Drone (`temple` in code), Hearth, Silence.
 - **Pond**: a koi pond seen from above (lily pads, lotus, three koi). Was **Cairn** (stones at a lake) until 2026-11-07. Sounds: Garden, Rain, Silence.
 - **Pace**: Short / Steady / Long, plus **Hold**. Every session starts Steady.
