@@ -1,18 +1,18 @@
-/* Orbit: a quiet patch of deep space, dark navy drifting into plum, a blue glow round the sphere. */
+/* Orbit: a quiet patch of deep space, a violet glow on near-black. */
 :root {
-  --bg: #0a0d2e;
+  --bg: #030209;
   --ink: #eadfcb;
-  --accent: #efe8ff;
-  --accent-2: #b9b2ff;
-  --accent-ink: #0a0b3a;
-  --glow: rgba(110, 110, 255, 0.4);
+  --accent: #efe5d3;
+  --accent-2: #bfb096;
+  --accent-ink: #030209;
+  --glow: rgba(242, 197, 138, 0.3);
   --dial: min(78vw, 42vh, 340px);
 }
 @supports (height: 1dvh) { :root { --dial: min(78vw, 42dvh, 340px); } }
 
 body {
-  background: linear-gradient(155deg, #081a40 0%, #0a0d2e 42%, #140b30 78%, #1d0c2a 100%);
-  background-color: #0a0d2e;
+  background: radial-gradient(80% 46% at 50% 42%, #3d22a8 0%, #1a0f58 34%, #07051a 62%, #020106 85%);
+  background-color: #020106;
 }
 
 .dusk {
@@ -55,10 +55,10 @@ body[data-phase="session"] .dusk { opacity: 0.38; }
 .dial .lap.on { opacity: 1; transform: none; }
 .dial .arc {
   fill: none;
-  stroke: #f6ecff;
+  stroke: #efe5d3;
   stroke-width: 3;
   stroke-linecap: round;
-  filter: drop-shadow(0 0 6px rgba(220, 130, 255, 0.75));
+  filter: drop-shadow(0 0 6px rgba(242, 197, 138, 0.55));
   transition: stroke-dashoffset 0.18s ease-out;
 }
 .dial .tick { fill: rgba(234, 223, 203, 0.35); }
