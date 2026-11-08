@@ -69,16 +69,22 @@
     .card p { margin: 0; font-size: 14px; line-height: 1.55; opacity: 0.78; max-width: 34ch; }
     .card .how { margin-top: 12px; font-size: 10.5px; letter-spacing: 0.24em; text-transform: uppercase; opacity: 0.6; }
 
-    /* Still */
-    .still { --c-ink: #eadfcb; background: radial-gradient(90% 70% at 50% 35%, #1a3f3b 0%, #0b201f 80%); }
-    .still .art::before, .still .art::after {
+    /* Orbit */
+    .orbit { --c-ink: #eadfcb; background: radial-gradient(75% 45% at 50% 38%, #3b2a8a 0%, #1a1650 35%, #070618 75%, #04030c 100%); }
+    .orbit .art::before, .orbit .art::after {
       content: ''; position: absolute; left: 50%; top: 38%;
       width: 120px; height: 120px; margin: -60px 0 0 -60px;
       border-radius: 50%; border: 1px solid rgba(234, 223, 203, 0.4);
       animation: ripple 6s ease-out infinite;
     }
-    .still .art::after { animation-delay: 3s; }
-    .still .stone {
+    .orbit .art::after { animation-delay: 3s; }
+    .orbit .stars {
+      position: absolute; left: 0; top: 0; width: 1.5px; height: 1.5px; border-radius: 50%;
+      box-shadow: 169px 81px rgba(255,255,255,.9), 337px 28px rgba(255,255,255,.35), 278px 52px rgba(255,255,255,.7), 302px 33px rgba(255,255,255,.5), 23px 48px rgba(255,255,255,.9), 218px 39px rgba(255,255,255,.5), 50px 286px rgba(255,255,255,.9), 34px 293px rgba(255,255,255,.35), 118px 326px rgba(255,255,255,.35), 299px 303px rgba(255,255,255,.9), 29px 117px rgba(255,255,255,.35), 289px 72px rgba(255,255,255,.7), 218px 77px rgba(255,255,255,.35), 296px 161px rgba(255,255,255,.5), 56px 301px rgba(255,255,255,.5), 194px 53px rgba(255,255,255,.35), 292px 34px rgba(255,255,255,.5), 258px 276px rgba(255,255,255,.9), 164px 242px rgba(255,255,255,.9), 189px 157px rgba(255,255,255,.5), 96px 128px rgba(255,255,255,.35), 298px 157px rgba(255,255,255,.9), 179px 233px rgba(255,255,255,.7), 315px 41px rgba(255,255,255,.35), 266px 218px rgba(255,255,255,.5), 179px 81px rgba(255,255,255,.9), 219px 24px rgba(255,255,255,.35), 289px 297px rgba(255,255,255,.7), 178px 183px rgba(255,255,255,.9), 300px 237px rgba(255,255,255,.35), 51px 142px rgba(255,255,255,.9), 37px 35px rgba(255,255,255,.7), 335px 299px rgba(255,255,255,.9), 149px 201px rgba(255,255,255,.7);
+      animation: twinkle 5s ease-in-out infinite alternate;
+    }
+    @keyframes twinkle { to { opacity: 0.55; } }
+    .orbit .stone {
       position: absolute; left: 50%; top: 38%; width: 30px; height: 26px; margin: -13px 0 0 -15px;
       border-radius: 52% 48% 46% 54% / 58% 56% 44% 42%;
       background: radial-gradient(circle at 36% 30%, #c1bdb6, #a49e93 55%, #6b6760);
@@ -149,10 +155,10 @@
   </header>
 
   <nav class="designs" aria-label="Designs">
-    <a class="card still" href="still/">
-      <div class="art" aria-hidden="true"><span class="stone"></span></div>
-      <h2>Still</h2>
-      <p>A candlelit pool at night. Steam drifts and every breath sends a ripple across the water.</p>
+    <a class="card orbit" href="orbit/">
+      <div class="art" aria-hidden="true"><span class="stars"></span><span class="stone"></span></div>
+      <h2>Orbit</h2>
+      <p>A quiet patch of deep space. Stars glimmer and every breath sends a ripple out through the dark.</p>
       <span class="how">Turn the stone around the dial</span>
     </a>
     <a class="card ember" href="ember/">

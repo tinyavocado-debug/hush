@@ -1,25 +1,23 @@
-/* Still: a candlelit pool at night. */
+/* Orbit: a quiet patch of deep space, blue drifting into plum. */
 :root {
-  --bg: #0b201f;
+  --bg: #121646;
   --ink: #eadfcb;
   --accent: #efe5d3;
   --accent-2: #bfb096;
-  --accent-ink: #0d2523;
+  --accent-ink: #121646;
   --glow: rgba(242, 197, 138, 0.3);
   --dial: min(78vw, 42vh, 340px);
 }
 @supports (height: 1dvh) { :root { --dial: min(78vw, 42dvh, 340px); } }
 
 body {
-  background:
-    radial-gradient(120% 70% at 50% 115%, #2c4c42 0%, rgba(20, 51, 49, 0) 60%),
-    radial-gradient(90% 60% at 50% 40%, #153533 0%, #0b201f 75%);
-  background-color: #0b201f;
+  background: linear-gradient(155deg, #0e2a62 0%, #121646 42%, #22124a 78%, #321640 100%);
+  background-color: #121646;
 }
 
 .dusk {
   position: fixed; inset: 0; pointer-events: none;
-  background: #040e0e;
+  background: #020109;
   opacity: 0;
   transition: opacity 4s ease;
 }
@@ -143,8 +141,8 @@ body[data-phase="session"] .dusk { opacity: 0.38; }
   -webkit-mask-image: radial-gradient(circle closest-side, #000 82%, transparent 100%);
   mask-image: radial-gradient(circle closest-side, #000 82%, transparent 100%);
 }
-/* With WebGL, the dot-sphere canvas (still.js) replaces the CSS sphere above. It is 1.6x the
-   ring box (SHELL_SCALE in still.js), so the sphere can swell past the timer ring. */
+/* With WebGL, the dot-sphere canvas (orbit.js) replaces the CSS sphere above. It is 1.6x the
+   ring box (SHELL_SCALE in orbit.js), so the sphere can swell past the timer ring. */
 .shell { position: absolute; left: -30%; top: -30%; width: 160%; height: 160%; pointer-events: none; }
 .orb-wrap.gl .orb, .orb-wrap.gl .orb-grain { display: none; }
 .ring { position: absolute; inset: 0; width: 100%; height: 100%; }
