@@ -3,7 +3,7 @@
    raw IPs are never stored. Visits from localhost aren't counted.
    Set CODE to the site code chosen at sign-up (https://CODE.goatcounter.com). */
 (function () {
-  const CODE = ''; // e.g. 'hush' → https://hush.goatcounter.com
+  const CODE = 'tinyavocado'; // https://tinyavocado.goatcounter.com
 
   if (!CODE) {
     console.warn('[hush] analytics off: set CODE in shared/analytics.js');
