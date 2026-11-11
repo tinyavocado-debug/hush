@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>Hush Usage</title>
+  <link rel="icon" href="../icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    /* One column of quiet panels on the picker's warm dark; rooms keep their own hue. */
+    :root {
+      --bg: #1a1714;
+      --panel: #221e1a;
+      --ink: #efe6d8;
+      --ink-soft: rgba(239, 230, 216, 0.72);
+      --ink-faint: rgba(239, 230, 216, 0.45);
+      --line: rgba(239, 230, 216, 0.12);
+      --bar: rgba(239, 230, 216, 0.55);
+      --orbit: #a99cf0;
+      --ember: #e9a764;
+      --pond: #7cc4b2;
+      --warn: #e9c46a;
+      --bad: #e58b7a;
+      --serif: 'Cormorant Garamond', Georgia, serif;
+      --sans: 'Jost', system-ui, -apple-system, sans-serif;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--ink);
+      font: 300 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased;
+      padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 64px max(16px, env(safe-area-inset-left));
+    }
+    main { max-width: 860px; margin: 0 auto; display: grid; gap: 20px; }
+    h1 { font: 400 2.6rem/1 var(--serif); margin: 0; letter-spacing: .01em; }
+    h1 em { color: var(--ink-faint); }
+    h2 { font: 500 .72rem/1 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 14px; }
+    .top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; }
+    .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+    .seg button { font: 400 .85rem var(--sans); color: var(--ink-soft); background: none; border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+    .seg button[aria-pressed="true"] { background: var(--line); color: var(--ink); }
+    button:focus-visible, input:focus-visible { outline: 2px solid var(--ink-soft); outline-offset: 2px; }
+
+    .banner { border: 1px solid var(--warn); color: var(--warn); border-radius: 10px; padding: 12px 16px; display: grid; gap: 10px; }
+    .banner.error { border-color: var(--bad); color: var(--bad); }
+    .banner p { margin: 0; }
+    .banner form { display: flex; flex-wrap: wrap; gap: 8px; }
+    .banner input { flex: 1 1 260px; min-width: 0; font: 400 .9rem var(--sans); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+    .btn { font: 400 .85rem var(--sans); color: var(--bg); background: var(--ink); border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+    .link { font: 400 .8rem var(--sans); color: var(--ink-faint); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
+    a { color: inherit; }
+
+    .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border-radius: 12px; overflow: hidden; }
+    .tile { background: var(--panel); padding: 16px 18px; }
+    .tile b { display: block; font: 400 2.2rem/1.1 var(--serif); font-variant-numeric: lining-nums tabular-nums; }
+    .tile span { font-size: .82rem; color: var(--ink-faint); }
+    @media (max-width: 640px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+
+    section.panel { background: var(--panel); border-radius: 12px; padding: 18px; min-width: 0; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+
+    .days { display: flex; align-items: end; gap: 2px; height: 140px; border-bottom: 1px solid var(--line); }
+    .days div { flex: 1; background: var(--bar); border-radius: 2px 2px 0 0; min-height: 1px; position: relative; }
+    .days div:hover { background: var(--ink); }
+    .days-axis { display: flex; justify-content: space-between; font-size: .75rem; color: var(--ink-faint); margin-top: 6px; font-variant-numeric: tabular-nums; }
+
+    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    th { font: 500 .7rem var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); text-align: right; padding: 0 0 8px 12px; }
+    th:first-child, td:first-child { text-align: left; padding-left: 0; }
+    td { text-align: right; padding: 9px 0 9px 12px; border-top: 1px solid var(--line); }
+    .scroll { overflow-x: auto; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
+
+    .bars { display: grid; gap: 7px; }
+    .row { display: grid; grid-template-columns: minmax(0, 9rem) 1fr 3ch; align-items: center; gap: 10px; font-size: .88rem; }
+    .row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-soft); }
+    .row .track { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+    .row .fill { height: 100%; border-radius: 4px; background: var(--bar); }
+    .row .n { text-align: right; font-variant-numeric: tabular-nums; }
+    .empty { color: var(--ink-faint); font-size: .88rem; margin: 0; }
+    .note { color: var(--ink-faint); font-size: .8rem; margin: 0; max-width: 70ch; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <h1>Hush <em>usage</em></h1>
+    <div class="seg" role="group" aria-label="Date range">
+      <button type="button" data-days="7">7 days</button>
+      <button type="button" data-days="30">30 days</button>
+      <button type="button" data-days="90">90 days</button>
+    </div>
+  </div>
+
+  <div id="status"></div>
+
+  <div class="tiles">
+    <div class="tile"><b id="t-visitors">–</b><span>visitors</span></div>
+    <div class="tile"><b id="t-starts">–</b><span>sessions started</span></div>
+    <div class="tile"><b id="t-finished">–</b><span>stayed to the end</span></div>
+    <div class="tile"><b id="t-rested">–</b><span>time rested</span></div>
+  </div>
+
+  <section class="panel">
+    <h2>Visitors per day</h2>
+    <div class="days" id="days"></div>
+    <div class="days-axis"><span id="d-first"></span><span id="d-max"></span><span id="d-last"></span></div>
+  </section>
+
+  <section class="panel">
+    <h2>Rooms</h2>
+    <div class="scroll"><table id="rooms"></table></div>
+  </section>
+
+  <div class="grid2">
+    <section class="panel"><h2>Sounds</h2><div class="bars" id="sounds"></div></section>
+    <section class="panel"><h2>Breath</h2><div class="bars" id="breaths"></div></section>
+    <section class="panel"><h2>Session length chosen</h2><div class="bars" id="lengths"></div></section>
+    <section class="panel"><h2>Came from</h2><div class="bars" id="refs"></div></section>
+    <section class="panel"><h2>Countries</h2><div class="bars" id="countries"></div></section>
+    <section class="panel"><h2>Screens</h2><div class="bars" id="sizes"></div></section>
+  </div>
+
+  <p class="note">Numbers come from GoatCounter. It counts each page or event once per visitor in a short window, so someone who starts the same setup twice in a row counts once. Visitors are counted per page, so someone who opens the picker and then a room may count twice. Visitors with ad blockers aren't counted. Your own visits from localhost aren't counted either.</p>
+</main>
+
+<script>
+(() => {
+  const SITE = 'https://tinyavocado.goatcounter.com';
+  const ROOMS = { orbit: 'Orbit', ember: 'Ember', pond: 'Pond' };
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
+  };
+  let days = +store.get('hush.stats.days') || 30;
+
+  /* ───── fetching ───── */
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  // From local midnight n-1 days ago to the end of this hour (GoatCounter wants whole hours).
+  function range(n) {
+    const t = new Date(), start = new Date(t.getFullYear(), t.getMonth(), t.getDate() - (n - 1));
+    const end = new Date(t); end.setMinutes(0, 0, 0); end.setHours(end.getHours() + 1);
+    return { start: start.toISOString(), end: end.toISOString() };
+  }
+  async function api(token, path, params) {
+    const q = new URLSearchParams(params).toString();
+    const r = await fetch(`${SITE}/api/v0/${path}?${q}`, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    });
+    if (!r.ok) {
+      const body = await r.text().catch(() => '');
+      const e = new Error(`${path}: ${r.status} ${body.slice(0, 200)}`); e.status = r.status; throw e;
+    }
+    return r.json();
+  }
+  async function load(token, n) {
+    const p = range(n);
+    const hits = await api(token, 'stats/hits', { ...p, limit: 200 });
+    // Visitors over pages only: GoatCounter's own total also counts events.
+    const pageIds = (hits.hits || []).filter((h) => !h.event).map((h) => h.path_id);
+    const [total, locations, sizes, refs] = await Promise.all([
+      pageIds.length ? api(token, 'stats/total', { ...p, include_paths: pageIds.join(',') }) : { total: 0, stats: [] },
+      api(token, 'stats/locations', { ...p, limit: 8 }),
+      api(token, 'stats/sizes', { ...p, limit: 8 }),
+      api(token, 'stats/toprefs', { ...p, limit: 8 }),
+    ]);
+    return {
+      visitors: total.total,
+      perDay: (total.stats || []).map((s) => ({ day: s.day, n: s.daily })),
+      hits: hits.hits || [], more: !!hits.more,
+      countries: (locations.stats || []).map((s) => ({ name: s.name || 'Unknown', n: s.count })),
+      sizes: (sizes.stats || []).map((s) => ({ name: s.name || s.id || 'Unknown', n: s.count })),
+      refs: (refs.stats || []).map((s) => ({ name: s.name || '(direct or unknown)', n: s.count })),
+    };
+  }
+
+  /* ───── sample data: only shown, and labelled, until a token is connected ───── */
+  function sample(n) {
+    let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const perDay = Array.from({ length: n }, (_, i) => ({ day: ymd(new Date(Date.now() - (n - 1 - i) * 864e5)), n: Math.round(3 + rnd() * 9 + i * 0.15) }));
+    const hits = [], ev = (path, c) => hits.push({ path, event: true, count: c });
+    const pg = (path, c) => hits.push({ path, event: false, count: c });
+    const s = n / 30;
+    pg('/hush/', Math.round(160 * s)); pg('/hush/orbit/', Math.round(90 * s)); pg('/hush/ember/', Math.round(45 * s)); pg('/hush/pond/', Math.round(38 * s));
+    [['orbit', 'float', 'steady', 10, 34], ['orbit', 'voyage', 'balance', 20, 12], ['orbit', 'silence', 'short', 5, 9], ['ember', 'drone', 'steady', 15, 18],
+     ['ember', 'hearth', 'stillness', 30, 7], ['pond', 'garden', 'long+hold', 10, 14], ['pond', 'rain', 'steady', 20, 11]]
+      .forEach(([r, so, b, m, c]) => ev(`begin/${r}/${so}/${b}/${m}m`, Math.round(c * s)));
+    [['finished', 'orbit', 10, 26], ['ended-early', 'orbit', 3, 14], ['finished', 'ember', 15, 17], ['ended-early', 'ember', 6, 5],
+     ['finished', 'pond', 10, 16], ['ended-early', 'pond', 2, 6]].forEach(([k, r, m, c]) => ev(`${k}/${r}/${m}m`, Math.round(c * s)));
+    return {
+      visitors: perDay.reduce((a, d) => a + d.n, 0), perDay, hits, more: false,
+      countries: [{ name: 'Netherlands', n: 40 }, { name: 'United States', n: 31 }, { name: 'Germany', n: 12 }],
+      sizes: [{ name: 'Phones', n: 58 }, { name: 'Computers', n: 29 }, { name: 'Tablets', n: 7 }],
+      refs: [{ name: '(direct or unknown)', n: 70 }, { name: 'github.com', n: 9 }],
+    };
+  }
+
+  /* ───── turning event paths into numbers ───── */
+  function summarise(d) {
+    const room = {}; Object.keys(ROOMS).forEach((k) => (room[k] = { visitors: 0, starts: 0, finished: 0, early: 0, minutes: 0, sounds: {} }));
+    const sounds = {}, breaths = {}, lengths = {};
+    const add = (o, k, n) => (o[k] = (o[k] || 0) + n);
+    for (const h of d.hits) {
+      const path = h.path.replace(/^\/+/, ''), n = h.count || 0;
+      if (!h.event) {
+        const m = path.match(/^(?:hush\/)?(orbit|ember|pond)\/?$/);
+        if (m) room[m[1]].visitors += n;
+        continue;
+      }
+      const p = path.split('/');
+      if (p[0] === 'begin' && room[p[1]]) {
+        const [, r, so, br, len] = p, R = room[r];
+        R.starts += n; add(R.sounds, so, n);
+        add(sounds, `${ROOMS[r]} · ${so}`, n); add(breaths, br, n); add(lengths, len, n);
+      } else if ((p[0] === 'finished' || p[0] === 'ended-early') && room[p[1]]) {
+        const R = room[p[1]], mins = parseInt(p[2], 10) || 0;
+        p[0] === 'finished' ? (R.finished += n) : (R.early += n);
+        R.minutes += mins * n;
+      }
+    }
+    return { room, sounds, breaths, lengths };
+  }
+
+  /* ───── drawing ───── */
+  const fmtMin = (m) => (m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}`);
+  const pct = (a, b) => (b ? `${Math.round((100 * a) / b)}%` : '–');
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+  function bars(el, list, fmt = cap) {
+    list = list.filter((x) => x.n > 0).sort((a, b) => b.n - a.n).slice(0, 8);
+    if (!list.length) { el.innerHTML = '<p class="empty">Nothing yet.</p>'; return; }
+    const max = list[0].n;
+    el.innerHTML = list.map((x) => `<div class="row"><span class="name" title="${esc(fmt(x.name))}">${esc(fmt(x.name))}</span>
+      <span class="track"><span class="fill" style="display:block;width:${(100 * x.n) / max}%"></span></span><span class="n">${x.n}</span></div>`).join('');
+  }
+  const toList = (o) => Object.entries(o).map(([name, n]) => ({ name, n }));
+  const breathName = (s) => s.split('+').map(cap).join(' + ');
+
+  function render(d) {
+    const s = summarise(d), R = Object.values(s.room);
+    const starts = R.reduce((a, r) => a + r.starts, 0), fin = R.reduce((a, r) => a + r.finished, 0), early = R.reduce((a, r) => a + r.early, 0);
+    $('t-visitors').textContent = d.visitors;
+    $('t-starts').textContent = starts;
+    $('t-finished').textContent = pct(fin, fin + early);
+    $('t-rested').textContent = fmtMin(R.reduce((a, r) => a + r.minutes, 0));
+
+    const max = Math.max(1, ...d.perDay.map((x) => x.n));
+    $('days').innerHTML = d.perDay.map((x) => `<div style="height:${(100 * x.n) / max}%" title="${x.day}: ${x.n}"></div>`).join('');
+    const short = (day) => day ? new Date(day + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+    $('d-first').textContent = short(d.perDay[0]?.day);
+    $('d-max').textContent = `busiest day: ${max}`;
+    $('d-last').textContent = short(d.perDay.at(-1)?.day);
+
+    $('rooms').innerHTML = `<tr><th>Room</th><th>Visitors</th><th>Started</th><th>To the end</th><th>Rested</th><th>Top sound</th></tr>` +
+      Object.entries(s.room).map(([k, r]) => {
+        const top = Object.entries(r.sounds).sort((a, b) => b[1] - a[1])[0];
+        return `<tr><td><span class="dot" style="background:var(--${k})"></span>${ROOMS[k]}</td><td>${r.visitors}</td><td>${r.starts}</td>
+          <td>${pct(r.finished, r.finished + r.early)}</td><td>${fmtMin(r.minutes)}</td><td>${top ? esc(cap(top[0])) : '–'}</td></tr>`;
+      }).join('');
+
+    bars($('sounds'), toList(s.sounds), (n) => n.replace(/ · (\w)/, (m, c) => ` · ${c.toUpperCase()}`));
+    bars($('breaths'), toList(s.breaths), breathName);
+    bars($('lengths'), toList(s.lengths).sort((a, b) => parseInt(a.name) - parseInt(b.name)), (n) => `${parseInt(n)} min`);
+    bars($('refs'), d.refs, (n) => n);
+    bars($('countries'), d.countries, (n) => n);
+    bars($('sizes'), d.sizes, (n) => n);
+  }
+
+  /* ───── status banner: sample, error, or connected ───── */
+  function banner(kind, html) { $('status').innerHTML = html ? `<div class="banner ${kind}">${html}</div>` : ''; }
+  const connectForm = `<form id="connect"><input id="token" type="password" autocomplete="off" placeholder="Paste a GoatCounter API token" aria-label="GoatCounter API token"><button class="btn">Connect</button></form>
+    <p class="note">Make one at <a href="${SITE}/user/api" target="_blank" rel="noopener">${SITE.replace('https://', '')}/user/api</a> with only “Read statistics” ticked. It's kept in this browser only.</p>`;
+
+  async function refresh() {
+    document.querySelectorAll('[data-days]').forEach((b) => b.setAttribute('aria-pressed', +b.dataset.days === days));
+    const token = store.get('hush.stats.token');
+    if (!token) {
+      banner('', `<p><b>Sample data.</b> These numbers are made up to show the layout. Connect GoatCounter to see real usage.</p>${connectForm}`);
+      render(sample(days));
+      return;
+    }
+    banner('', '<p>Loading…</p>');
+    try {
+      const d = await load(token, days);
+      render(d);
+      banner('', d.more ? '<p>Showing the top 200 pages and events; some rare setups are left out.</p>' : '');
+      $('status').insertAdjacentHTML('beforeend', '<button type="button" class="link" id="forget">Disconnect</button>');
+    } catch (e) {
+      const why = e.status === 401 || e.status === 403 ? 'GoatCounter refused the token. Make a new one with “Read statistics” and paste it here.'
+        : e.status === 429 ? 'GoatCounter is rate-limiting; wait a few seconds and reload.' : `Couldn't load stats: ${esc(e.message)}`;
+      banner('error', `<p>${why}</p>${connectForm}`);
+      ['t-visitors', 't-starts', 't-finished', 't-rested'].forEach((id) => ($(id).textContent = '–'));
+    }
+  }
+
+  document.addEventListener('submit', (e) => {
+    if (e.target.id !== 'connect') return;
+    e.preventDefault();
+    const v = $('token').value.trim();
+    if (v) { store.set('hush.stats.token', v); refresh(); }
+  });
+  document.addEventListener('click', (e) => {
+    if (e.target.id === 'forget') { store.set('hush.stats.token', null); refresh(); }
+    const b = e.target.closest('[data-days]');
+    if (b) { days = +b.dataset.days; store.set('hush.stats.days', days); refresh(); }
+  });
+  refresh();
+})();
+</script>
+</body>
+</html>
