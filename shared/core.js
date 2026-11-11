@@ -794,6 +794,7 @@
       main.classList.add('show-hint'); // not 'hint': that's the hint text's own class
       setTimeout(() => main.classList.remove('show-hint'), 5000);
       cfg.onBegin?.();
+      track(`begin/${room}/${soundName()}/${breathName()}/${st.minutes}m`);
     }
 
     function togglePause() {
@@ -840,7 +841,14 @@
       document.title = cfg.title;
       setPhase('complete');
       cfg.onComplete?.(early);
+      track(`${early ? 'ended-early' : 'finished'}/${room}/${m}m`);
     }
+
+    // Usage counts (shared/analytics.js): the room, its sound, breath and length.
+    const room = cfg.short.toLowerCase();
+    const track = (name) => window.hushTrack?.(name);
+    const soundName = () => (document.querySelector(`[data-sound="${st.sound}"]`)?.textContent.trim() || st.sound).toLowerCase();
+    const breathName = () => Spa.pattern.id + (Spa.pattern.hold ? '+hold' : '');
 
     $('#begin').addEventListener('click', begin);
     $('#again').addEventListener('click', () => { audio.ensure(); st.sound = 'silence'; renderChoices(); setPhase('setup'); });
