@@ -163,12 +163,11 @@
     const hits = await api(token, 'stats/hits', { ...p, limit: 200 });
     // Visitors over pages only: GoatCounter's own total also counts events.
     const pageIds = (hits.hits || []).filter((h) => !h.event).map((h) => h.path_id);
-    const [total, locations, sizes, refs] = await Promise.all([
-      pageIds.length ? api(token, 'stats/total', { ...p, include_paths: pageIds.join(',') }) : { total: 0, stats: [] },
-      api(token, 'stats/locations', { ...p, limit: 8 }),
-      api(token, 'stats/sizes', { ...p, limit: 8 }),
-      api(token, 'stats/toprefs', { ...p, limit: 8 }),
-    ]);
+    // One at a time: GoatCounter allows only a few API calls a second.
+    const total = pageIds.length ? await api(token, 'stats/total', { ...p, include_paths: pageIds.join(',') }) : { total: 0, stats: [] };
+    const locations = await api(token, 'stats/locations', { ...p, limit: 8 });
+    const sizes = await api(token, 'stats/sizes', { ...p, limit: 8 });
+    const refs = await api(token, 'stats/toprefs', { ...p, limit: 8 });
     return {
       visitors: total.total,
       perDay: (total.stats || []).map((s) => ({ day: s.day, n: s.daily })),
@@ -292,7 +291,9 @@
       banner('', d.more ? '<p>Showing the top 200 pages and events; some rare setups are left out.</p>' : '');
       $('status').insertAdjacentHTML('beforeend', '<button type="button" class="link" id="forget">Disconnect</button>');
     } catch (e) {
-      const why = e.status === 401 || e.status === 403 ? 'GoatCounter refused the token. Make a new one with “Read statistics” and paste it here.'
+      const blocked = e instanceof TypeError; // no reply at all: the browser stopped the request
+      const why = blocked ? 'Your browser blocked the request to goatcounter.com. This is almost always an ad or tracker blocker (uBlock Origin, Brave Shields, Safari content blockers, Firefox strict tracking protection). Allow goatcounter.com on this page, then reload.'
+        : e.status === 401 || e.status === 403 ? 'GoatCounter refused the token. Make a new one with “Read statistics” and paste it here.'
         : e.status === 429 ? 'GoatCounter is rate-limiting; wait a few seconds and reload.' : `Couldn't load stats: ${esc(e.message)}`;
       banner('error', `<p>${why}</p>${connectForm}`);
       ['t-visitors', 't-starts', 't-finished', 't-rested'].forEach((id) => ($(id).textContent = '–'));
