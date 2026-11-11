@@ -147,28 +147,45 @@
     const end = new Date(t); end.setMinutes(0, 0, 0); end.setHours(end.getHours() + 1);
     return { start: start.toISOString(), end: end.toISOString() };
   }
-  async function api(token, path, params) {
+  // GoatCounter rate-limits its API (429). Calls go out one at a time, a little apart,
+  // and a 429 waits and tries again (shown in the banner) before giving up.
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  let lastCall = 0, gen = 0;
+  async function api(token, path, params, myGen) {
     const q = new URLSearchParams(params).toString();
-    const r = await fetch(`${SITE}/api/v0/${path}?${q}`, {
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    });
+    let r;
+    for (let attempt = 0; ; attempt++) {
+      await wait(Math.max(0, lastCall + 500 - Date.now()));
+      if (myGen !== gen) throw Object.assign(new Error('superseded'), { superseded: true });
+      lastCall = Date.now();
+      r = await fetch(`${SITE}/api/v0/${path}?${q}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      if (r.status !== 429 || attempt === 4) break;
+      const secs = Math.max(+r.headers.get('Retry-After') || 0, 2 ** attempt * 2);
+      banner('', `<p>GoatCounter asked to slow down; trying again in ${secs}s…</p>`);
+      await wait(secs * 1000);
+      banner('', '<p>Loading…</p>');
+    }
     if (!r.ok) {
       const body = await r.text().catch(() => '');
       const e = new Error(`${path}: ${r.status} ${body.slice(0, 200)}`); e.status = r.status; throw e;
     }
     return r.json();
   }
-  async function load(token, n) {
-    const p = range(n);
-    const hits = await api(token, 'stats/hits', { ...p, limit: 200 });
+  const cache = {}; // per range, for 5 minutes, so switching back doesn't ask again
+  async function load(token, n, myGen) {
+    const hit = cache[n];
+    if (hit && Date.now() - hit.at < 5 * 60e3) return hit.data;
+    const p = range(n), get = (path, params) => api(token, path, params, myGen);
+    const hits = await get('stats/hits', { ...p, limit: 200 });
     // Visitors over pages only: GoatCounter's own total also counts events.
     const pageIds = (hits.hits || []).filter((h) => !h.event).map((h) => h.path_id);
-    // One at a time: GoatCounter allows only a few API calls a second.
-    const total = pageIds.length ? await api(token, 'stats/total', { ...p, include_paths: pageIds.join(',') }) : { total: 0, stats: [] };
-    const locations = await api(token, 'stats/locations', { ...p, limit: 8 });
-    const sizes = await api(token, 'stats/sizes', { ...p, limit: 8 });
-    const refs = await api(token, 'stats/toprefs', { ...p, limit: 8 });
-    return {
+    const total = pageIds.length ? await get('stats/total', { ...p, include_paths: pageIds.join(',') }) : { total: 0, stats: [] };
+    const locations = await get('stats/locations', { ...p, limit: 8 });
+    const sizes = await get('stats/sizes', { ...p, limit: 8 });
+    const refs = await get('stats/toprefs', { ...p, limit: 8 });
+    const data = {
       visitors: total.total,
       perDay: (total.stats || []).map((s) => ({ day: s.day, n: s.daily })),
       hits: hits.hits || [], more: !!hits.more,
@@ -176,6 +193,8 @@
       sizes: (sizes.stats || []).map((s) => ({ name: s.name || s.id || 'Unknown', n: s.count })),
       refs: (refs.stats || []).map((s) => ({ name: s.name || '(direct or unknown)', n: s.count })),
     };
+    cache[n] = { at: Date.now(), data };
+    return data;
   }
 
   /* ───── sample data: only shown, and labelled, until a token is connected ───── */
@@ -284,17 +303,20 @@
       render(sample(days));
       return;
     }
+    const myGen = ++gen; // a newer refresh (range switch) replaces this one
     banner('', '<p>Loading…</p>');
     try {
-      const d = await load(token, days);
+      const d = await load(token, days, myGen);
+      if (myGen !== gen) return;
       render(d);
       banner('', d.more ? '<p>Showing the top 200 pages and events; some rare setups are left out.</p>' : '');
       $('status').insertAdjacentHTML('beforeend', '<button type="button" class="link" id="forget">Disconnect</button>');
     } catch (e) {
-      const blocked = e instanceof TypeError; // no reply at all: the browser stopped the request
-      const why = blocked ? 'Your browser blocked the request to goatcounter.com. This is almost always an ad or tracker blocker (uBlock Origin, Brave Shields, Safari content blockers, Firefox strict tracking protection). Allow goatcounter.com on this page, then reload.'
+      if (e.superseded || myGen !== gen) return;
+      const blocked = e instanceof TypeError; // no reply at all
+      const why = blocked ? 'Couldn\'t reach goatcounter.com. An ad or tracker blocker, a VPN, or being offline can cause this.'
         : e.status === 401 || e.status === 403 ? 'GoatCounter refused the token. Make a new one with “Read statistics” and paste it here.'
-        : e.status === 429 ? 'GoatCounter is rate-limiting; wait a few seconds and reload.' : `Couldn't load stats: ${esc(e.message)}`;
+        : e.status === 429 ? 'GoatCounter is still rate-limiting after several tries. Wait a minute, then reload.' : `Couldn't load stats: ${esc(e.message)}`;
       banner('error', `<p>${why}</p>${connectForm}`);
       ['t-visitors', 't-starts', 't-finished', 't-rested'].forEach((id) => ($(id).textContent = '–'));
     }
@@ -307,7 +329,7 @@
     if (v) { store.set('hush.stats.token', v); refresh(); }
   });
   document.addEventListener('click', (e) => {
-    if (e.target.id === 'forget') { store.set('hush.stats.token', null); refresh(); }
+    if (e.target.id === 'forget') { store.set('hush.stats.token', null); Object.keys(cache).forEach((k) => delete cache[k]); refresh(); }
     const b = e.target.closest('[data-days]');
     if (b) { days = +b.dataset.days; store.set('hush.stats.days', days); refresh(); }
   });

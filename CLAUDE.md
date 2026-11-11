@@ -3,7 +3,7 @@
 - **Start:** `python3 -m http.server 8766` from the repo root (no build step)
 - **Port:** 8766
 - **Main URL:** http://localhost:8766/ (rooms: `/orbit/`, `/ember/`, `/pond/`)
-- **Usage stats:** http://localhost:8766/stats/ reads GoatCounter (tinyavocado.goatcounter.com) with a read-only API token kept in that browser. Ad/tracker blockers stop it ("browser blocked the request"), so allow goatcounter.com. Events are sent from `shared/analytics.js` (`begin/<room>/<sound>/<breath>/<min>m`, `finished|ended-early/<room>/<min>m`); localhost visits aren't counted.
+- **Usage stats:** http://localhost:8766/stats/ reads GoatCounter (tinyavocado.goatcounter.com) with a read-only API token kept in that browser. GoatCounter rate-limits its API (429), so the page spaces its calls, retries, and caches each range for 5 minutes. Events are sent from `shared/analytics.js` (`begin/<room>/<sound>/<breath>/<min>m`, `finished|ended-early/<room>/<min>m`); localhost visits aren't counted.
 
 ## Names
 
