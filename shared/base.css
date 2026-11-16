@@ -151,6 +151,43 @@ h1 {
 }
 .sounds button { font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; }
 
+/* The session's mode: Sleep / Steady / Breath, and below it the mode's own choice. */
+.mode { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+.modes { display: flex; width: 100%; border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
+.modes button {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 38px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  transition: background 0.4s, color 0.4s;
+}
+.modes button[aria-checked="true"] { background: var(--chip-on); color: var(--ink); }
+.mode-more { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 44px; }
+.mode-more > * { display: none; }
+main[data-mode="steady"] .mode-steady { display: block; width: min(100%, 320px); }
+.mode .paces { border-color: transparent; }
+.mode .paces button, .mode .hold-toggle { height: 34px; }
+main[data-mode="sleep"] .mode-sleep { display: block; }
+main[data-mode="breath"] .mode-breath { display: flex; }
+.mode-sleep { margin: 0; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-faint); }
+.mode-breath {
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 14px 0 22px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font: italic 300 18px/1 var(--serif);
+  letter-spacing: 0.03em;
+  color: var(--ink);
+}
+.mode-breath svg { width: 16px; height: 16px; fill: none; stroke: var(--ink-faint); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.mode-breath:active { transform: scale(0.97); }
+
 /* The breath menu's button, top right: on the setup screen, and with the session controls. */
 .breath-open {
   position: fixed;
@@ -175,8 +212,9 @@ h1 {
 }
 .breath-open svg { width: 18px; height: 18px; fill: none; stroke: var(--ink-soft); stroke-width: 1.4; stroke-linecap: round; }
 .breath-open-word { font: italic 300 17px/1 var(--serif); letter-spacing: 0.03em; white-space: nowrap; }
-main[data-state="setup"] .breath-open, main.show-controls .breath-open { opacity: 1; pointer-events: auto; transform: none; }
-main[data-state="setup"] .breath-open { transition-delay: 0.25s; }
+main.show-controls .breath-open { opacity: 1; pointer-events: auto; transform: none; }
+/* On the setup screen the mode row does its job; Sleep has nothing to change mid-session. */
+main[data-state="setup"] .breath-open, main[data-mode="sleep"] .breath-open { display: none; }
 .breath-open:active { transform: scale(0.97); }
 main.show-controls .hint { opacity: 0; } /* the tap hint shares the top of the screen */
 
@@ -206,8 +244,10 @@ main.show-controls .hint { opacity: 0; } /* the tap hint shares the top of the s
   transition: transform 0.5s ease;
 }
 .bmenu.open .bmenu-panel { transform: none; }
+.bmenu[data-mode="steady"] .bmenu-tech, .bmenu[data-mode="breath"] .bmenu-pace { display: none; }
 /* Your own pace: Short / Steady / Long, and Hold. */
-.bmenu-own { display: flex; gap: 6px; margin-top: 14px; }
+.pace-row { display: flex; gap: 6px; width: 100%; }
+.bmenu .pace-row { margin-top: 14px; }
 .paces { display: flex; flex: 3 1 0; min-width: 0; border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
 .paces button, .hold-toggle {
   flex: 1 1 0;
@@ -223,7 +263,6 @@ main.show-controls .hint { opacity: 0; } /* the tap hint shares the top of the s
 .hold-toggle { height: 44px; border: 1px solid var(--line); }
 .paces button[aria-checked="true"], .hold-toggle[aria-pressed="true"] { background: var(--chip-on); color: var(--ink); }
 .hold-toggle[aria-pressed="true"] { border-color: var(--ink-faint); }
-.bmenu-or { margin-top: 28px; }
 .bmenu-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
