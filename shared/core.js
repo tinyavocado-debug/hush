@@ -16,7 +16,7 @@
     { id: 'balance', word: 'Balance', name: 'Sama Vritti', sub: 'Equal breathing', t: [4, 0, 4, 0],
       note: 'Builds a consistent breathing rhythm. Useful for centering yourself before work, yoga, or meditation.' },
     { id: 'recovery', word: 'Recovery', name: 'Visama Vritti', sub: 'Extended exhale', t: [4, 0, 8, 0],
-      note: 'Traditionally used for settling the mind and reducing agitation. A gentler starting pattern is 4–6.' },
+      note: 'Traditionally used for settling the mind and reducing agitation. If eight counts out feels long, Steady (4 in, 6 out) is a gentler start.' },
     { id: 'concentration', word: 'Concentration', name: 'Antara Kumbhaka', sub: 'Inhale retention', t: [4, 2, 4, 0],
       note: 'Introduces a pause after inhaling. Traditionally used to cultivate attention, steadiness, and control over the breath.' },
     { id: 'stillness', word: 'Stillness', name: 'Bahya Kumbhaka', sub: 'Exhale retention', t: [4, 0, 4, 2],
@@ -26,7 +26,7 @@
     { id: 'control', word: 'Control', name: 'Visama Vritti', sub: 'Graduated retention', t: [4, 2, 6, 0],
       note: 'A mixed ratio that integrates inhalation retention with a longer exhale. A useful intermediate practice for learning measured breath control.' },
     { id: 'advanced', word: 'Advanced', name: 'Classical 1:4:2 ratio', sub: '', t: [4, 16, 8, 0],
-      note: 'A traditional pranayama ratio associated with deeper concentration and mastery of retention. Not a beginner exercise; the long retention should be learned with qualified instruction.' },
+      note: 'A traditional pranayama ratio (the Gheranda Samhita counts it 16 : 64 : 32), associated with deeper concentration and mastery of retention. Not a beginner exercise: learn the long hold with a qualified teacher, and skip it if you are pregnant or have heart or blood-pressure problems.' },
     { id: 'alertness', word: 'Alertness', name: 'Visama Vritti', sub: 'Extended inhale', t: [6, 0, 4, 0],
       note: 'An inhale-emphasized variation sometimes used for a more activating experience. Evidence for a reliable alertness boost is limited.' },
     { id: 'body', word: 'Body', name: 'Three-part breathing', sub: 'Progressive', t: [6, 0, 6, 0], parts: ['belly', 'ribs', 'chest'],
@@ -36,7 +36,7 @@
     { id: 'senses', word: 'Senses', name: 'Bhramari', sub: 'Humming exhale', t: [4, 0, 8, 0], say: { out: 'hum' },
       note: 'The extended humming exhale provides vibration and an auditory anchor. Traditionally used for inward attention and quieting mental chatter.' },
     { id: 'activating', word: 'Activating', name: 'Bhastrika', sub: 'Bellows breathing', t: [1, 0, 1, 0], say: { in: 'in', out: 'out' },
-      note: '' },
+      note: 'Quick, forceful breaths in and out through the nose, pumped from the belly, traditionally used to energize. Stop if you feel dizzy. Usually advised against with high blood pressure, heart disease, epilepsy, hernia, or pregnancy.' },
   ];
   Spa.technique = (id) => Spa.TECHNIQUES.find((x) => x.id === id) || null;
   // Your own pace: how long each breath in and out lasts, and an optional hold after each.
