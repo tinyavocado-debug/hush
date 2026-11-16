@@ -350,14 +350,14 @@
     // so nothing pulses on its own clock). The three low notes hold still; the three high ones
     // go through `bloom`, which the bed swells with the breath. Returns the tone filter, the
     // bloom and a function that glides the pad to another chord.
-    function starPad(c, level, wet) {
+    function starPad(c, level, wet, chords = STAR_CHORDS) {
       const send = gain(wet); send.connect(spaceSend());
       c.bed.connect(send);
       const tone = filt('lowpass', 900, 0.3), bloom = gain(0.3);
       tone.connect(gain(level)).connect(c.bed);
       const levels = [1, 0.75, 0.5, 0.5, 0.32, 0.2], sum = 2.25;
       const pans = [0, -0.35, 0.35, -0.2, -0.5, 0.5];
-      const voices = STAR_CHORDS[0].pad.map((r, i) => {
+      const voices = chords[0].pad.map((r, i) => {
         const g = gain(levels[i] / sum), p = panner(pans[i]);
         g.connect(p).connect(i < 3 ? tone : bloom);
         const o = osc(c, 'sine', D * r); o.connect(g);
@@ -366,7 +366,7 @@
       bloom.connect(tone);
       const toChord = (ch, sec = 1.2) => {
         const t = ctx.currentTime;
-        STAR_CHORDS[ch].pad.forEach((r, i) => {
+        chords[ch].pad.forEach((r, i) => {
           voices[i].frequency.cancelScheduledValues(t);
           voices[i].frequency.setTargetAtTime(D * r, t, sec);
         });
@@ -374,7 +374,50 @@
       return { tone, bloom, toChord };
     }
 
+    // Calmer chords for Orbit (2026-11-15 round 3): plain open triads, low, with no 7ths or 9ths.
+    const CALM_CHORDS = [
+      { pad: [1, 3 / 2, 2, 5 / 2, 3, 4] },     // D: D3 A3 D4 F#4 A4 D5
+      { pad: [1, 4 / 3, 2, 8 / 3, 10 / 3, 4] }, // G over D: D3 G3 D4 G4 B4 D5
+    ];
+    // A calm pad that follows the breath only a little: the tone opens a touch and the top
+    // notes come up on the breath in.
+    function calmPad(c) {
+      const pad = starPad(c, 0.26, 0.7, CALM_CHORDS);
+      pad.breathe = (p) => {
+        breathShape(pad.tone.frequency, p, 1100, 520, true);
+        breathShape(pad.bloom.gain, p, 0.75, 0.35);
+      };
+      return pad;
+    }
+
     const BEDS = {
+      hum(c) {
+        // One open D chord, dark and steady; only the breath moves it, and only a little.
+        const pad = calmPad(c);
+        c.breathe = (p) => pad.breathe(p);
+      },
+      dusk(c) {
+        // Hum, plus one low, soft note at the top of each breath in, A and F# by turns.
+        const pad = calmPad(c), notes = gain(1); notes.connect(c.bed);
+        c.breathe = (p, cycle) => {
+          pad.breathe(p);
+          const top = breathPattern.inhale - p;
+          if (breathPattern.inhale > 0 && top >= 0) {
+            const pan = cycle % 2 ? 0.25 : -0.25;
+            glass(notes, ctx.currentTime + top / 1000, D * (cycle % 2 ? 5 / 2 : 3), 0.03, 6, pan);
+            setTimeout(() => { if (!c.stopped) emit('drop', { pan, peak: 0.02 }); }, top);
+          }
+        };
+      },
+      tide(c) {
+        // Hum, sliding very slowly between D and G-over-D (the D stays put) every fourth breath.
+        const pad = calmPad(c);
+        c.chord = 0;
+        c.breathe = (p, cycle) => {
+          pad.breathe(p);
+          if (p < 300 && cycle > 0 && cycle % 4 === 0) pad.toChord((c.chord = 1 - c.chord), 3);
+        };
+      },
       float(c) {
         // Only the breath moves it: the high notes of the chord bloom and the tone opens on each
         // breath in, and both settle on the breath out. One soft note rings at the top of each
