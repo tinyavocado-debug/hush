@@ -409,87 +409,89 @@
       });
     }
 
-    // A glass note that swells in rather than being struck, peaks at `peak`, then fades slowly.
-    // A quiet octave above rounds it. Goes dry to the bed's notes and into the echo.
-    function swellNote(c, peak, f, vol, rise, fall, pan = 0) {
-      const p = panner(pan); p.connect(c.notes); p.connect(c.echo);
-      [[1, 1], [2, 0.12]].forEach(([r, a]) => {
-        const o = ctx.createOscillator(), g = ctx.createGain();
-        o.frequency.value = f * r;
-        g.gain.setValueAtTime(0, peak - rise);
-        g.gain.linearRampToValueAtTime(vol * a, peak);
-        g.gain.setTargetAtTime(0, peak, fall / 4);
-        o.connect(g).connect(p); o.start(peak - rise); o.stop(peak + fall + 0.2);
+    // Warm tones for the trial sounds: a sine with soft, quickly falling harmonics (no detuning).
+    function warmWave(n, roll) {
+      const re = new Float32Array(n + 1), im = new Float32Array(n + 1);
+      for (let i = 1; i <= n; i++) im[i] = Math.pow(i, -roll);
+      return ctx.createPeriodicWave(re, im);
+    }
+    const WARM_CHORD = [1 / 2, 3 / 4, 1, 5 / 4, 3 / 2, 9 / 4]; // D2 A2 D3 F#3 A3 E4
+    const WARM_LEVELS = [1, 0.8, 0.7, 0.55, 0.45, 0.3];
+    const WARM_PANS = [0, -0.3, 0.3, -0.45, 0.45, 0];
+    // The low chord through a filter that opens on the breath in. The three upper notes come up
+    // with the breath and sink away on the breath out.
+    function warmPad(c, level) {
+      const send = gain(0.8); send.connect(spaceSend()); c.bed.connect(send);
+      const tone = filt('lowpass', 380, 0.5), upper = gain(0.25), wave = warmWave(10, 1.8);
+      tone.connect(gain(level)).connect(c.bed);
+      upper.connect(tone);
+      WARM_CHORD.forEach((r, i) => {
+        const o = osc(c, 'sine', D * r); o.setPeriodicWave(wave);
+        o.connect(gain(WARM_LEVELS[i] * 0.09)).connect(panner(WARM_PANS[i])).connect(i < 3 ? tone : upper);
       });
+      return {
+        breathe(p) {
+          breathShape(tone.frequency, p, 2000, 380, true);
+          breathShape(upper.gain, p, 1, 0.25);
+        },
+      };
+    }
+    // Faint high starlight (A5 D6 F#6) that fades in while a breath is held and out as it moves.
+    function holdStars(c, p) {
+      if (!c.stars) {
+        c.stars = gain(0); c.stars.connect(c.bed);
+        [[6, 0.012, -0.5], [8, 0.009, 0.5], [10, 0.006, 0]].forEach(([r, a, pan]) =>
+          osc(c, 'sine', D * r).connect(gain(a)).connect(panner(pan)).connect(c.stars));
+      }
+      const P = breathPattern, ramp = (ms, f) => Math.min(1, (f * ms) / 900, ((1 - f) * ms) / 900);
+      breathCurve(c.stars.gain, p, (b) =>
+        b.stage === 'hold-in' ? ramp(P.holdIn, b.f) : b.stage === 'hold-out' ? 0.6 * ramp(P.holdOut, b.f) : 0);
     }
 
     const BEDS = {
-      // Trial (2026-11-16): three takes on Float, relaxing and cosmic, beside the current one.
-      stardust(c) {
-        // Float slowed right down: the same wonder chord, swaying only every fourth breath, and in
-        // place of the runs just two far-apart notes on the breath in and one low one on the out,
-        // each ringing long into the echo.
-        const pad = orbitPad(c, 0.3, 0.9);
-        c.breathe = (p, cycle) => {
-          const P = breathPattern;
-          pad.breathe(p);
-          if (p < 300 && cycle > 0 && cycle % 4 === 0) pad.next(4);
-          const notes = SPARKLES[c.chord], list = [], side = cycle % 2 ? 1 : -1;
-          if (P.inhale > 0) {
-            list.push([0, D * notes[0], 0.022, 5, -0.4 * side]);
-            list.push([P.inhale * 0.55, D * notes[2], 0.016, 6, 0.4 * side]);
-          }
-          if (P.exhale > 0) list.push([P.inhale + P.holdIn + 200, D * notes[1] / 2, 0.02, 7, 0]);
-          sprinkle(c, p, list);
-        };
+      // Trial (2026-11-16, round 2): warm and comforting, still cosmic, and plainly following
+      // breath in, hold and breath out.
+      glow(c) {
+        // A low, soft D major chord that opens up and swells as you breathe in, rests full while
+        // you hold, and closes back down as you breathe out. Faint starlight shines in each hold.
+        const pad = warmPad(c, 1);
+        c.breathe = (p) => { pad.breathe(p); holdStars(c, p); };
       },
-      aurora(c) {
-        // Overtone singing in space: a low D and its harmonics, with a narrow band that climbs the
-        // harmonics on each breath in and slides back down on the out, so they sing one by one.
-        // Left and right ears climb a little apart.
-        const d2 = D / 2, src0 = gain(1), N = 12;
-        let sum = 0;
-        for (let n = 1; n <= N; n++) sum += Math.pow(n, -0.8);
-        for (let n = 1; n <= N; n++) osc(c, 'sine', d2 * n).connect(gain(Math.pow(n, -0.8) / sum)).connect(src0);
-        src0.connect(filt('lowpass', 400, 0.3)).connect(gain(0.45)).connect(c.bed);
-        const sing = gain(0.6), bands = [[-0.6, 1], [0.6, 1.12]].map(([pan, r]) => {
-          const a = filt('bandpass', 220 * r, 9), b = filt('bandpass', 220 * r, 9);
-          src0.connect(a).connect(b).connect(panner(pan)).connect(sing);
-          return [a, b, r];
-        });
-        sing.connect(c.bed);
+      choir(c) {
+        // The same chord sung as a soft hum: "oo" when empty, opening to "ah" as you breathe in,
+        // held on "ah", closing back to "oo" as you breathe out. Starlight in each hold.
         const send = gain(0.9); send.connect(spaceSend()); c.bed.connect(send);
+        const voices = gain(1), wave = warmWave(16, 1);
+        WARM_CHORD.forEach((r, i) => {
+          const o = osc(c, 'sine', D * r); o.setPeriodicWave(wave);
+          o.connect(gain(WARM_LEVELS[i] * 0.16)).connect(panner(WARM_PANS[i])).connect(voices);
+        });
+        const f1 = filt('bandpass', 320, 3), f2 = filt('bandpass', 800, 5), body = filt('lowpass', 220, 0.5);
+        const level = gain(0.6);
+        voices.connect(f1).connect(gain(1.6)).connect(level);
+        voices.connect(f2).connect(gain(1.1)).connect(level);
+        voices.connect(body).connect(gain(0.7)).connect(level);
+        level.connect(c.bed);
         c.breathe = (p) => {
-          bands.forEach(([a, b, r]) => {
-            breathShape(a.frequency, p, 1100 * r, 220 * r, true);
-            breathShape(b.frequency, p, 1100 * r, 220 * r, true);
-          });
-          breathShape(sing.gain, p, 1.5, 0.6);
+          breathShape(f1.frequency, p, 780, 320, true);
+          breathShape(f2.frequency, p, 1250, 800, true);
+          breathShape(level.gain, p, 1, 0.6);
+          holdStars(c, p);
         };
       },
-      comet(c) {
-        // The wonder chord, quieter, with glass notes that swell in rather than strike: two
-        // arrive together at the top of each breath in, and one low one blooms mid breath out.
-        const pad = orbitPad(c, 0.22, 0.9);
-        c.breathe = (p, cycle) => {
-          const P = breathPattern, t0 = ctx.currentTime - p / 1000, now0 = ctx.currentTime + 0.05;
+      lullaby(c) {
+        // The warm chord, softer, under a hummed voice that climbs a few notes as you breathe
+        // in, holds its top note while you hold, and steps back down as you breathe out.
+        const pad = warmPad(c, 0.6);
+        const steps = [3 / 2, 5 / 3, 2, 9 / 4, 5 / 2]; // A3 B3 D4 E4 F#4
+        const v = osc(c, 'sine', D * steps[0]); v.setPeriodicWave(warmWave(8, 1.5));
+        const tone = filt('lowpass', 1300, 0.4), vol = gain(0.03);
+        v.connect(tone).connect(vol).connect(c.bed);
+        c.breathe = (p) => {
           pad.breathe(p);
-          if (p < 300 && cycle > 0 && cycle % 2 === 0) pad.next(3);
-          const top = c.chord ? [10 / 3, 9 / 2] : [3, 9 / 2], low = c.chord ? 9 / 4 : 2;
-          const list = [];
-          if (P.inhale > 0) {
-            const rise = Math.min(2.6, P.inhale / 1000 * 0.85);
-            list.push([P.inhale, D * top[0], 0.035, rise, 5, -0.45]);
-            list.push([P.inhale + 250, D * top[1], 0.025, rise, 6, 0.45]);
-          }
-          if (P.exhale > 0) list.push([P.inhale + P.holdIn + P.exhale * 0.4, D * low, 0.04, Math.min(2.5, P.exhale / 1000 * 0.4), 6, 0]);
-          list.forEach(([at, f, vol, rise, fall, pan]) => {
-            const peak = t0 + at / 1000;
-            const r = Math.min(rise, peak - now0);
-            if (r < 0.6) return; // too late to swell in gently
-            swellNote(c, peak, f, vol, r, fall, pan);
-            setTimeout(() => { if (!c.stopped) emit('drop', { pan, peak: vol * 0.7 }); }, (peak - ctx.currentTime) * 1000);
-          });
+          breathCurve(v.frequency, p, (b) => D * steps[Math.min(4, Math.floor(b.k * 4.999))]);
+          breathCurve(vol.gain, p, (b) => 0.025 + 0.035 * b.k);
+          holdStars(c, p);
         };
       },
       float(c) {
