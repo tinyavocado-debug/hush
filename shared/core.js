@@ -704,7 +704,9 @@
     const oldTech = Spa.technique(prefs.get('choice')) ? prefs.get('choice') : null; // from before modes
     let lastTech = Spa.technique(prefs.get('tech')) ? prefs.get('tech') : oldTech || 'balance';
     let mode = MODES[prefs.get('mode')] ? prefs.get('mode') : oldTech ? 'breath' : 'steady';
-    const modePattern = () => (mode === 'sleep' ? ['long', false] : mode === 'breath' ? [lastTech] : [lastPace, lastHold]);
+    const modePattern = (m = mode) => (m === 'sleep' ? ['long', false] : m === 'breath' ? [lastTech] : [lastPace, lastHold]);
+    // A mode's pattern, without choosing it.
+    const patternFor = (m) => { const keep = Spa.pattern; Spa.setPattern(...modePattern(m)); const P = Spa.pattern; Spa.pattern = keep; return P; };
     Spa.setPattern(...modePattern());
 
     const paceRow = `
@@ -721,6 +723,16 @@
     modeBox.innerHTML = `
       <div class="modes" role="radiogroup" aria-label="Session">
         ${Object.entries(MODES).map(([k, v]) => `<button type="button" role="radio" data-mode="${k}">${v}</button>`).join('')}
+      </div>
+      <div class="modes-orbs" role="radiogroup" aria-label="Session">
+        ${Object.entries(MODES).map(([k, v]) => `<button type="button" role="radio" data-mode="${k}"><span class="mo-orb"><i></i></span><span class="mo-word">${v}</span></button>`).join('')}
+      </div>
+      <div class="modes-words" role="radiogroup" aria-label="Session">
+        <div class="mw-track">${Object.entries(MODES).map(([k, v]) => `<button type="button" role="radio" data-mode="${k}">${v}</button>`).join('')}</div>
+      </div>
+      <div class="modes-moon" role="radiogroup" aria-label="Session">
+        <div class="mm-rail"><span class="mm-line"></span>${[0, 1, 2].map((i) => `<span class="mm-stop" style="--at:${i / 2}"></span>`).join('')}<span class="mm-moon"></span></div>
+        <div class="mm-labels">${Object.entries(MODES).map(([k, v]) => `<button type="button" role="radio" data-mode="${k}">${v}</button>`).join('')}</div>
       </div>
       <div class="mode-more">
         <div class="mode-steady">${paceRow}</div>
@@ -772,14 +784,89 @@
       setBreath(lastPace, !lastHold);
       audio.ensure(); audio.tick(1.2);
     }));
-    modeBox.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => {
-      const m = b.dataset.mode, again = m === mode;
+    function chooseMode(m) {
+      const again = m === mode;
       mode = m;
       prefs.set('mode', m);
       setBreath(...modePattern());
       audio.ensure(); audio.tick(1.3);
       if (m === 'breath' && !again) openMenu();
+    }
+    let swallowModeClick = false; // a swipe or drag ends with a click that isn't a tap
+    modeBox.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => {
+      if (swallowModeClick) { swallowModeClick = false; return; }
+      chooseMode(b.dataset.mode);
     }));
+
+    /* ── Prototype styles for the mode picker (2026-11-16), switched from the chip at the top
+       right of the setup screen. Remove the losers once one is picked. ──
+       pills: the segmented row.  orbs: three orbs, each breathing at its own mode's rhythm.
+       words: one large word; swipe or tap a neighbour to turn it.  moon: drag a moon along a
+       rail; it waxes from a crescent at Sleep to full at Breath. */
+    const MODE_KEYS = Object.keys(MODES);
+    const PROTOS = { pills: 'Now', orbs: 'Orbs', words: 'Words', moon: 'Moon' };
+    const protoStore = Spa.store('proto');
+    const urlStyle = new URLSearchParams(location.search).get('menu');
+    let menuStyle = PROTOS[urlStyle] ? urlStyle : PROTOS[protoStore.get('menu')] ? protoStore.get('menu') : 'orbs';
+    const protoSwitch = document.createElement('div');
+    protoSwitch.className = 'proto-switch';
+    protoSwitch.innerHTML = Object.entries(PROTOS).map(([k, v]) => `<button type="button" data-proto="${k}">${v}</button>`).join('');
+    main.appendChild(protoSwitch);
+    function setMenuStyle(k) {
+      menuStyle = k; protoStore.set('menu', k);
+      main.dataset.menu = k;
+      protoSwitch.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.proto === k)));
+    }
+    protoSwitch.addEventListener('click', (e) => { const b = e.target.closest('[data-proto]'); if (b) setMenuStyle(b.dataset.proto); });
+    setMenuStyle(menuStyle);
+
+    // Orbs: each orb swells and settles with its own mode's breath.
+    let orbPat = {};
+    const orbBtns = [...modeBox.querySelectorAll('.modes-orbs [data-mode]')];
+    (function orbLoop(now) {
+      requestAnimationFrame(orbLoop);
+      if (menuStyle !== 'orbs' || st.phase !== 'setup') return;
+      orbBtns.forEach((b) => b.style.setProperty('--k', Spa.breathAt(now, orbPat[b.dataset.mode]).k.toFixed(3)));
+    })(performance.now());
+
+    // Words: swipe sideways to turn to the next word.
+    const words = modeBox.querySelector('.modes-words');
+    let swipe = null;
+    words.addEventListener('pointerdown', (e) => { swipe = { x: e.clientX }; });
+    words.addEventListener('pointerup', (e) => {
+      if (!swipe) return;
+      const dx = e.clientX - swipe.x; swipe = null;
+      if (Math.abs(dx) < 30) return;
+      swallowModeClick = !!e.target.closest('[data-mode]');
+      const i = clamp(MODE_KEYS.indexOf(mode) + (dx < 0 ? 1 : -1), 0, 2);
+      if (MODE_KEYS[i] !== mode) chooseMode(MODE_KEYS[i]);
+    });
+    words.addEventListener('pointercancel', () => { swipe = null; });
+
+    // Moon: drag along the rail (or tap it); the moon waxes as it goes and settles on the nearest stop.
+    const rail = modeBox.querySelector('.mm-rail');
+    let drag = null;
+    const railX = (e) => { const r = rail.getBoundingClientRect(); return clamp((e.clientX - r.left) / r.width, 0, 1); };
+    rail.addEventListener('pointerdown', (e) => {
+      rail.setPointerCapture(e.pointerId);
+      drag = { near: Math.round(railX(e) * 2) };
+      rail.classList.add('dragging');
+      rail.style.setProperty('--x', railX(e));
+    });
+    rail.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const x = railX(e), near = Math.round(x * 2);
+      rail.style.setProperty('--x', x);
+      if (near !== drag.near) { drag.near = near; audio.ensure(); audio.tick(0.9 + near * 0.3); vibrate(6); }
+    });
+    const endDrag = () => {
+      if (!drag) return;
+      const m = MODE_KEYS[drag.near]; drag = null;
+      rail.classList.remove('dragging');
+      if (m !== mode) chooseMode(m); else renderBreath();
+    };
+    rail.addEventListener('pointerup', endDrag);
+    rail.addEventListener('pointercancel', endDrag);
     modeBox.querySelector('.mode-breath').addEventListener('click', openMenu);
 
     function openMenu() {
@@ -884,6 +971,10 @@
       modeBox.querySelector('.mode-breath span').textContent = Spa.technique(lastTech).word;
       modeBox.querySelector('.mode-breath').setAttribute('aria-label', `Technique: ${Spa.technique(lastTech).word}. Change`);
       main.dataset.mode = menu.dataset.mode = mode;
+      const mi = MODE_KEYS.indexOf(mode);
+      modeBox.querySelector('.mw-track').style.setProperty('--i', mi);
+      rail.style.setProperty('--x', mi / 2);
+      orbPat = Object.fromEntries(MODE_KEYS.map((m) => [m, patternFor(m)]));
       Object.values(techBtn).forEach((b) => b.setAttribute('aria-checked', String(b.dataset.tech === P.id)));
       menu.querySelector('.bmenu-name').textContent = T ? (T.sub ? `${T.name} — ${T.sub}` : T.name) : `Your own pace — ${Spa.PACES[P.pace].label}`;
       menu.querySelector('.bmenu-counts').textContent = Spa.patternCounts(P);

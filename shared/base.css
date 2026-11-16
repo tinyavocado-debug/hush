@@ -188,6 +188,69 @@ main[data-mode="breath"] .mode-breath { display: flex; }
 .mode-breath svg { width: 16px; height: 16px; fill: none; stroke: var(--ink-faint); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
 .mode-breath:active { transform: scale(0.97); }
 
+/* ── Prototype picker styles (2026-11-16): main[data-menu] = pills | orbs | words | moon. ── */
+.modes-orbs, .modes-words, .modes-moon { display: none; }
+main[data-menu]:not([data-menu="pills"]) .modes { display: none; }
+main[data-menu="orbs"] .modes-orbs, main[data-menu="moon"] .modes-moon { display: flex; }
+main[data-menu="words"] .modes-words { display: block; }
+
+/* Orbs: each breathes at its own mode's rhythm (--k is its fullness, set every frame). */
+.modes-orbs { justify-content: center; gap: clamp(18px, 7vw, 40px); width: 100%; }
+.modes-orbs button { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 76px; color: var(--ink-faint); transition: color 0.5s; }
+.mo-orb { position: relative; display: grid; place-items: center; width: 50px; height: 50px; border-radius: 50%; border: 1px solid transparent; transition: border-color 0.5s; }
+.mo-orb i {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: radial-gradient(circle at 42% 38%, var(--ink) 0%, color-mix(in srgb, var(--ink) 55%, transparent) 45%, transparent 72%);
+  transform: scale(calc(0.42 + 0.58 * var(--k, 0.5)));
+  opacity: calc(0.28 + 0.3 * var(--k, 0.5));
+  transition: opacity 0.5s;
+}
+.mo-word { font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; padding-left: 0.22em; }
+.modes-orbs [aria-checked="true"] { color: var(--ink); }
+.modes-orbs [aria-checked="true"] .mo-orb { border-color: var(--line); }
+.modes-orbs [aria-checked="true"] .mo-orb i { opacity: calc(0.6 + 0.4 * var(--k, 0.5)); box-shadow: 0 0 calc(10px + 18px * var(--k, 0.5)) var(--glow); }
+.modes-orbs button:active .mo-orb { transform: scale(0.94); }
+
+/* Words: one large word in the middle; its neighbours wait, small and faint, at the sides. */
+.modes-words { position: relative; width: 100%; height: 50px; overflow: hidden; touch-action: pan-y;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent); }
+.mw-track { position: absolute; top: 0; bottom: 0; left: 0; display: flex; width: 120%;
+  transform: translateX(calc(41.667% - (var(--i, 1) + 0.5) * 33.333%));
+  transition: transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.mw-track button { flex: 1 1 0; font: italic 300 22px/1 var(--serif); letter-spacing: 0.04em; color: var(--ink-faint);
+  transform: scale(0.8); transition: transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1), color 0.7s, letter-spacing 0.7s; }
+.mw-track [aria-checked="true"] { color: var(--ink); transform: scale(1.45); letter-spacing: 0.1em; }
+
+/* Moon: drag along the rail; the moon waxes from a crescent at Sleep to full at Breath. */
+.modes-moon { flex-direction: column; align-items: center; width: 100%; }
+.mm-rail { position: relative; width: calc(100% - 64px); height: 40px; cursor: grab; touch-action: none; --x: 0.5; }
+.mm-rail.dragging { cursor: grabbing; }
+.mm-line { position: absolute; left: 0; right: 0; top: 50%; height: 1px;
+  background: linear-gradient(90deg, var(--line), var(--ink-faint)); }
+.mm-stop { position: absolute; top: 50%; left: calc(var(--at) * 100%); width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; background: var(--ink-faint); }
+.mm-moon {
+  position: absolute; top: 50%; left: calc(var(--x) * 100%);
+  width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; overflow: hidden;
+  background: radial-gradient(circle at 40% 38%, #fffaf0, var(--ink) 70%);
+  box-shadow: 0 0 calc(8px + 22px * var(--x)) color-mix(in srgb, var(--ink) calc(25% + 35% * var(--x)), transparent);
+  transition: left 0.6s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.6s;
+}
+/* The shadow that slides off the moon as it waxes. */
+.mm-moon::after { content: ''; position: absolute; inset: -1px; border-radius: 50%; background: var(--bg);
+  transform: translateX(calc(-18% - 84% * var(--x))); transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.mm-rail.dragging .mm-moon, .mm-rail.dragging .mm-moon::after { transition: none; }
+.mm-labels { display: flex; justify-content: space-between; width: 100%; margin-top: 2px; }
+.mm-labels button { width: 64px; height: 28px; font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; padding-left: 0.22em; color: var(--ink-faint); transition: color 0.5s; }
+.mm-labels [aria-checked="true"] { color: var(--ink); }
+
+/* The prototype switch, top right of the setup screen. Temporary. */
+.proto-switch { position: fixed; top: calc(var(--safe-t) + 10px); right: calc(var(--safe-r) + 10px); z-index: 6; display: none; gap: 2px;
+  padding: 2px; border-radius: 999px; border: 1px dashed var(--ink-faint); background: color-mix(in srgb, var(--bg) 60%, transparent); }
+main[data-state="setup"] .proto-switch { display: flex; }
+.proto-switch button { height: 28px; padding: 0 10px; border-radius: 999px; font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+.proto-switch [aria-pressed="true"] { background: var(--chip-on); color: var(--ink); }
+
 /* The breath menu's button, top right: on the setup screen, and with the session controls. */
 .breath-open {
   position: fixed;
