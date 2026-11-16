@@ -301,7 +301,126 @@
       setTimeout(() => emit('chime', { f }), (delay + 0.02) * 1000);
     }
 
+    /* Orbit's sounds, in the spirit of the loving-kindness app's background: pure sine tones in
+       just intonation (so chords sit still instead of beating), soft glassy notes, and a long warm
+       reverb that makes them feel far away. Here they're in D, the chords move by breaths rather
+       than on a clock, and the swell is the visuals' breath curve. */
+    const D = 146.83; // D3; every Orbit note is a just ratio of it
+    const STAR_CHORDS = [ // Dmaj9 → Gmaj9#11 → Bm11 → A6/9, each with the notes its arpeggio climbs
+      { pad: [3 / 2, 2, 5 / 2, 3, 15 / 4, 9 / 2], arp: [3, 4, 9 / 2, 5, 6] },
+      { pad: [4 / 3, 2, 5 / 2, 10 / 3, 15 / 4, 9 / 2], arp: [10 / 3, 15 / 4, 4, 5, 20 / 3] },
+      { pad: [5 / 3, 2, 5 / 2, 3, 15 / 4, 9 / 2], arp: [10 / 3, 4, 5, 6, 20 / 3] },
+      { pad: [3 / 2, 9 / 4, 5 / 2, 10 / 3, 15 / 4, 9 / 2], arp: [3, 15 / 4, 9 / 2, 5, 6] },
+    ];
+    const STAR_TWINKLES = [4, 9 / 2, 5, 6, 20 / 3, 8]; // D major pentatonic, up high
+
+    // A long (6 s), warm, wide reverb, made once and fed only by Orbit's sounds. Smoothed noise,
+    // different in each ear. It returns through the ambience gain, so dim and mute reach it.
+    let space = null;
+    function spaceSend() {
+      if (space) return space;
+      const len = Math.floor(ctx.sampleRate * 6), b = ctx.createBuffer(2, len, ctx.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = b.getChannelData(ch);
+        let s = 0;
+        for (let i = 0; i < len; i++) { s += 0.35 * (Math.random() * 2 - 1 - s); d[i] = s * Math.pow(1 - i / len, 2.5); }
+      }
+      const conv = ctx.createConvolver();
+      conv.buffer = b;
+      space = gain(0.9);
+      space.connect(conv).connect(ambienceGain);
+      return space;
+    }
+
+    // A soft glass note: a sine with two quiet harmonics, each a pair a hair apart for a slow
+    // shimmer, a gentle attack and a long ring.
+    function glass(dest, at, f, vol, ring, pan = 0) {
+      const p = panner(pan); p.connect(dest);
+      [[1, 1], [2, 0.22], [3, 0.07]].forEach(([r, a]) => {
+        const d = ring / r;
+        [0, 0.0004].forEach((dt) => {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.frequency.value = f * r * (1 + dt);
+          g.gain.setValueAtTime(0.0001, at);
+          g.gain.exponentialRampToValueAtTime((vol * a) / 2, at + 0.04);
+          g.gain.exponentialRampToValueAtTime(0.0001, at + d);
+          o.connect(g).connect(p); o.start(at); o.stop(at + d + 0.1);
+        });
+      });
+    }
+
+    // A wide pad of sine pairs on one of STAR_CHORDS, through a lowpass. Returns its tone filter,
+    // its level and a function that glides it to another chord.
+    function starPad(c, level, wet) {
+      const send = gain(wet); send.connect(spaceSend());
+      c.bed.connect(send);
+      const tone = filt('lowpass', 900, 0.3), lvl = gain(level);
+      tone.connect(lvl).connect(c.bed);
+      const levels = [1, 0.8, 0.5, 0.45, 0.25, 0.16], sum = levels.reduce((a, b) => a + b, 0);
+      const pans = [0, -0.35, 0.35, -0.15, -0.5, 0.5], drifts = [0.031, 0.043, 0.067, 0.057, 0.051, 0.023];
+      const voices = STAR_CHORDS[0].pad.map((r, i) => {
+        const g = gain(levels[i] / sum), p = panner(pans[i]);
+        g.connect(p).connect(tone);
+        lfo(c, drifts[i], (levels[i] / sum) * 0.3, g.gain); // each voice comes and goes a little
+        return [0, 0.0003].map((dt) => { const o = osc(c, 'sine', D * r * (1 + dt)); o.connect(g); return [o, dt]; });
+      });
+      const toChord = (ch, sec = 1.2) => {
+        const t = ctx.currentTime;
+        STAR_CHORDS[ch].pad.forEach((r, i) => voices[i].forEach(([o, dt]) => {
+          o.frequency.cancelScheduledValues(t);
+          o.frequency.setTargetAtTime(D * r * (1 + dt), t, sec);
+        }));
+      };
+      return { tone, lvl, toChord };
+    }
+
     const BEDS = {
+      float(c) {
+        // The pad swells and opens with each breath in and settles with each breath out, moving
+        // to the next chord every second breath; now and then a far-off note, likelier near the top.
+        const { tone, lvl, toChord } = starPad(c, 0.3, 0.8);
+        const twinkles = gain(1); twinkles.connect(c.bed);
+        c.chord = 0;
+        c.breathe = (p, cycle) => {
+          breathShape(tone.frequency, p, 2600, 700, true);
+          breathShape(lvl.gain, p, 0.32, 0.15);
+          if (p < 300 && cycle > 0 && cycle % 2 === 0) toChord((c.chord = (c.chord + 1) % STAR_CHORDS.length), 1.4);
+        };
+        chain(c, () => (3000 + Math.random() * 7000) / (0.6 + 2 * now(lvl.gain)), () => {
+          const f = D * STAR_TWINKLES[Math.floor(Math.random() * STAR_TWINKLES.length)];
+          const peak = 0.025 + Math.random() * 0.025, pan = Math.random() * 1.4 - 0.7;
+          glass(twinkles, ctx.currentTime + 0.02, f, peak, 5, pan);
+          emit('drop', { pan, peak: peak * 0.6 });
+        });
+      },
+      voyage(c) {
+        // A slow music box over a quiet pad: its notes climb the chord through each breath in and
+        // walk back down through each breath out, one chord per breath.
+        const { tone, lvl, toChord } = starPad(c, 0.15, 0.75);
+        const notes = gain(1); notes.connect(c.bed);
+        c.chord = 0;
+        c.breathe = (p, cycle) => {
+          const P = breathPattern, t0 = ctx.currentTime - p / 1000;
+          breathShape(tone.frequency, p, 2000, 650, true);
+          breathShape(lvl.gain, p, 0.16, 0.08);
+          if (p < 300 && cycle > 0) toChord((c.chord = (c.chord + 1) % STAR_CHORDS.length), 0.8);
+          const arp = STAR_CHORDS[c.chord].arp;
+          // n notes spread through a stage that starts `start` ms into the breath and lasts `dur`.
+          const run = (start, dur, up) => {
+            const n = Math.max(2, Math.min(arp.length, Math.round(dur / 1300)));
+            for (let i = 0; i < n; i++) {
+              const at = start + (i * dur) / n;
+              if (at < p) continue; // already past
+              const step = up ? i : n - 1 - i, f = D * arp[step];
+              const pan = (step / (arp.length - 1)) * 0.8 - 0.4, peak = (i === 0 ? 0.075 : 0.06) * (0.85 + Math.random() * 0.15);
+              glass(notes, t0 + at / 1000 + 0.02, f, peak, up ? 3.5 : 4.5, pan);
+              setTimeout(() => { if (!c.stopped) emit('drop', { pan, peak: peak * 0.4 }); }, at - p);
+            }
+          };
+          if (P.inhale > 0) run(0, P.inhale, true);
+          if (P.exhale > 0) run(P.inhale + P.holdIn, P.exhale, false);
+        };
+      },
       ocean(c) {
         src(c, buf('brown'), 0.9).connect(filt('lowpass', 180)).connect(gain(0.55)).connect(c.bed);
         const surf = filt('lowpass', 420, 0.5), swell = gain(0.3);
