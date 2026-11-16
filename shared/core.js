@@ -448,6 +448,31 @@
         b.stage === 'hold-in' ? ramp(P.holdIn, b.f) : b.stage === 'hold-out' ? 0.6 * ramp(P.holdOut, b.f) : 0);
     }
 
+    // A warm chime: a soft (15 ms) strike, a long-ringing fundamental, a gentle octave and a
+    // touch of the 3rd harmonic, all rolled off so it rings round rather than bright.
+    function warmChime(c, at, f, vol, pan) {
+      if (!c.chimeOut) { c.chimeOut = filt('lowpass', 2200, 0.4); c.chimeOut.connect(c.bed); }
+      const p = panner(pan); p.connect(c.chimeOut);
+      [[1, 1, 6], [2, 0.3, 2.5], [3, 0.07, 1.2]].forEach(([r, a, d]) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.value = f * r;
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.exponentialRampToValueAtTime(vol * a, at + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + d);
+        o.connect(g).connect(p); o.start(at); o.stop(at + d + 0.1);
+      });
+    }
+    // Rings chimes at offsets (ms into the breath) from a breath that is now `p` ms in; skips any
+    // already past and ripples the scene with each.
+    function warmChimes(c, p, list) {
+      const t0 = ctx.currentTime - p / 1000;
+      list.forEach(([at, f, vol, pan]) => {
+        if (at < p - 50) return;
+        warmChime(c, t0 + Math.max(at, p) / 1000 + 0.02, f, vol, pan);
+        setTimeout(() => { if (!c.stopped) emit('drop', { pan, peak: vol * 0.7 }); }, Math.max(0, at - p));
+      });
+    }
+
     const BEDS = {
       // Trial (2026-11-16, round 2): warm and comforting, still cosmic, and plainly following
       // breath in, hold and breath out.
@@ -457,41 +482,46 @@
         const pad = warmPad(c, 1);
         c.breathe = (p) => { pad.breathe(p); holdStars(c, p); };
       },
-      choir(c) {
-        // The same chord sung as a soft hum: "oo" when empty, opening to "ah" as you breathe in,
-        // held on "ah", closing back to "oo" as you breathe out. Starlight in each hold.
-        const send = gain(0.9); send.connect(spaceSend()); c.bed.connect(send);
-        const voices = gain(1), wave = warmWave(16, 1);
-        WARM_CHORD.forEach((r, i) => {
-          const o = osc(c, 'sine', D * r); o.setPeriodicWave(wave);
-          o.connect(gain(WARM_LEVELS[i] * 0.16)).connect(panner(WARM_PANS[i])).connect(voices);
-        });
-        const f1 = filt('bandpass', 320, 3), f2 = filt('bandpass', 800, 5), body = filt('lowpass', 220, 0.5);
-        const level = gain(0.6);
-        voices.connect(f1).connect(gain(1.6)).connect(level);
-        voices.connect(f2).connect(gain(1.1)).connect(level);
-        voices.connect(body).connect(gain(0.7)).connect(level);
-        level.connect(c.bed);
+      // Round 3: Glow plus a few warm chimes, three ways.
+      cues(c) {
+        // A warm chime as each breath in starts (A4), a lower one as each breath out starts (D4).
+        const pad = warmPad(c, 1);
         c.breathe = (p) => {
-          breathShape(f1.frequency, p, 780, 320, true);
-          breathShape(f2.frequency, p, 1250, 800, true);
-          breathShape(level.gain, p, 1, 0.6);
-          holdStars(c, p);
+          const P = breathPattern, list = [];
+          pad.breathe(p); holdStars(c, p);
+          if (P.inhale > 0) list.push([0, D * 3, 0.06, -0.3]);
+          if (P.exhale > 0) list.push([P.inhale + P.holdIn, D * 2, 0.07, 0.3]);
+          warmChimes(c, p, list);
         };
       },
-      lullaby(c) {
-        // The warm chord, softer, under a hummed voice that climbs a few notes as you breathe
-        // in, holds its top note while you hold, and steps back down as you breathe out.
-        const pad = warmPad(c, 0.6);
-        const steps = [3 / 2, 5 / 3, 2, 9 / 4, 5 / 2]; // A3 B3 D4 E4 F#4
-        const v = osc(c, 'sine', D * steps[0]); v.setPeriodicWave(warmWave(8, 1.5));
-        const tone = filt('lowpass', 1300, 0.4), vol = gain(0.03);
-        v.connect(tone).connect(vol).connect(c.bed);
+      drift(c) {
+        // Two chimes drift in at loose moments through each breath in, now and then one more
+        // while holding, and sometimes a low one on the way out. A different pair each breath.
+        const pad = warmPad(c, 1), notes = [2, 5 / 2, 3, 4];
+        const pick = () => D * notes[Math.floor(Math.random() * notes.length)];
         c.breathe = (p) => {
-          pad.breathe(p);
-          breathCurve(v.frequency, p, (b) => D * steps[Math.min(4, Math.floor(b.k * 4.999))]);
-          breathCurve(vol.gain, p, (b) => 0.025 + 0.035 * b.k);
-          holdStars(c, p);
+          const P = breathPattern, list = [], pan = () => Math.random() * 1.2 - 0.6;
+          pad.breathe(p); holdStars(c, p);
+          if (P.inhale > 0) {
+            list.push([P.inhale * (0.05 + Math.random() * 0.25), pick(), 0.05, pan()]);
+            list.push([P.inhale * (0.45 + Math.random() * 0.3), pick(), 0.04, pan()]);
+          }
+          if (P.holdIn > 1500 && Math.random() < 0.4) list.push([P.inhale + P.holdIn * 0.4, D * 4, 0.03, pan()]);
+          if (P.exhale > 0 && Math.random() < 0.5) list.push([P.inhale + P.holdIn + P.exhale * (0.2 + Math.random() * 0.3), D * 2, 0.06, pan()]);
+          warmChimes(c, p, list);
+        };
+      },
+      crest(c) {
+        // A soft rolled chord of chimes (F#4 A4 D5) at the top of each breath in, and one low
+        // chime (D4) as the breath out comes to rest.
+        const pad = warmPad(c, 1);
+        c.breathe = (p) => {
+          const P = breathPattern, list = [];
+          pad.breathe(p); holdStars(c, p);
+          if (P.inhale > 0) [[5 / 2, -0.4], [3, 0], [4, 0.4]].forEach(([r, pan], i) =>
+            list.push([Math.max(0, P.inhale - 500) + i * 240, D * r, 0.045 - i * 0.006, pan]));
+          if (P.exhale > 0) list.push([P.inhale + P.holdIn + P.exhale - 300, D * 2, 0.06, 0]);
+          warmChimes(c, p, list);
         };
       },
       float(c) {
