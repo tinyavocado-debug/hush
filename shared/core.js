@@ -409,7 +409,89 @@
       });
     }
 
+    // A glass note that swells in rather than being struck, peaks at `peak`, then fades slowly.
+    // A quiet octave above rounds it. Goes dry to the bed's notes and into the echo.
+    function swellNote(c, peak, f, vol, rise, fall, pan = 0) {
+      const p = panner(pan); p.connect(c.notes); p.connect(c.echo);
+      [[1, 1], [2, 0.12]].forEach(([r, a]) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.value = f * r;
+        g.gain.setValueAtTime(0, peak - rise);
+        g.gain.linearRampToValueAtTime(vol * a, peak);
+        g.gain.setTargetAtTime(0, peak, fall / 4);
+        o.connect(g).connect(p); o.start(peak - rise); o.stop(peak + fall + 0.2);
+      });
+    }
+
     const BEDS = {
+      // Trial (2026-11-16): three takes on Float, relaxing and cosmic, beside the current one.
+      stardust(c) {
+        // Float slowed right down: the same wonder chord, swaying only every fourth breath, and in
+        // place of the runs just two far-apart notes on the breath in and one low one on the out,
+        // each ringing long into the echo.
+        const pad = orbitPad(c, 0.3, 0.9);
+        c.breathe = (p, cycle) => {
+          const P = breathPattern;
+          pad.breathe(p);
+          if (p < 300 && cycle > 0 && cycle % 4 === 0) pad.next(4);
+          const notes = SPARKLES[c.chord], list = [], side = cycle % 2 ? 1 : -1;
+          if (P.inhale > 0) {
+            list.push([0, D * notes[0], 0.022, 5, -0.4 * side]);
+            list.push([P.inhale * 0.55, D * notes[2], 0.016, 6, 0.4 * side]);
+          }
+          if (P.exhale > 0) list.push([P.inhale + P.holdIn + 200, D * notes[1] / 2, 0.02, 7, 0]);
+          sprinkle(c, p, list);
+        };
+      },
+      aurora(c) {
+        // Overtone singing in space: a low D and its harmonics, with a narrow band that climbs the
+        // harmonics on each breath in and slides back down on the out, so they sing one by one.
+        // Left and right ears climb a little apart.
+        const d2 = D / 2, src0 = gain(1), N = 12;
+        let sum = 0;
+        for (let n = 1; n <= N; n++) sum += Math.pow(n, -0.8);
+        for (let n = 1; n <= N; n++) osc(c, 'sine', d2 * n).connect(gain(Math.pow(n, -0.8) / sum)).connect(src0);
+        src0.connect(filt('lowpass', 400, 0.3)).connect(gain(0.45)).connect(c.bed);
+        const sing = gain(0.6), bands = [[-0.6, 1], [0.6, 1.12]].map(([pan, r]) => {
+          const a = filt('bandpass', 220 * r, 9), b = filt('bandpass', 220 * r, 9);
+          src0.connect(a).connect(b).connect(panner(pan)).connect(sing);
+          return [a, b, r];
+        });
+        sing.connect(c.bed);
+        const send = gain(0.9); send.connect(spaceSend()); c.bed.connect(send);
+        c.breathe = (p) => {
+          bands.forEach(([a, b, r]) => {
+            breathShape(a.frequency, p, 1100 * r, 220 * r, true);
+            breathShape(b.frequency, p, 1100 * r, 220 * r, true);
+          });
+          breathShape(sing.gain, p, 1.5, 0.6);
+        };
+      },
+      comet(c) {
+        // The wonder chord, quieter, with glass notes that swell in rather than strike: two
+        // arrive together at the top of each breath in, and one low one blooms mid breath out.
+        const pad = orbitPad(c, 0.22, 0.9);
+        c.breathe = (p, cycle) => {
+          const P = breathPattern, t0 = ctx.currentTime - p / 1000, now0 = ctx.currentTime + 0.05;
+          pad.breathe(p);
+          if (p < 300 && cycle > 0 && cycle % 2 === 0) pad.next(3);
+          const top = c.chord ? [10 / 3, 9 / 2] : [3, 9 / 2], low = c.chord ? 9 / 4 : 2;
+          const list = [];
+          if (P.inhale > 0) {
+            const rise = Math.min(2.6, P.inhale / 1000 * 0.85);
+            list.push([P.inhale, D * top[0], 0.035, rise, 5, -0.45]);
+            list.push([P.inhale + 250, D * top[1], 0.025, rise, 6, 0.45]);
+          }
+          if (P.exhale > 0) list.push([P.inhale + P.holdIn + P.exhale * 0.4, D * low, 0.04, Math.min(2.5, P.exhale / 1000 * 0.4), 6, 0]);
+          list.forEach(([at, f, vol, rise, fall, pan]) => {
+            const peak = t0 + at / 1000;
+            const r = Math.min(rise, peak - now0);
+            if (r < 0.6) return; // too late to swell in gently
+            swellNote(c, peak, f, vol, r, fall, pan);
+            setTimeout(() => { if (!c.stopped) emit('drop', { pan, peak: vol * 0.7 }); }, (peak - ctx.currentTime) * 1000);
+          });
+        };
+      },
       float(c) {
         // A floating wonder chord that swells with each breath in, swaying to the chord a step up
         // every second breath. A quick sparkle run rises as each breath in starts, and a slower
