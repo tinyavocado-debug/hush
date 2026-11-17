@@ -409,7 +409,8 @@
       });
     }
 
-    /* Trial (2026-11-16, round 5): three new Orbit sounds that aren't cosmic at all. */
+    /* Trial (2026-11-16, round 6): a relaxing fairytale, three ways. All in D major (just
+       intonation on Orbit's D), one chord per breath going round D, B minor, G, A. */
 
     // Notes planned ahead on the audio clock are remembered, so a new breath can call off the
     // ones not yet started; any already ringing ring on.
@@ -418,156 +419,223 @@
       const t = ctx.currentTime + 0.02;
       (c.pending || []).forEach((n) => { if (n.at > t) n.oscs.forEach((o) => { try { o.stop(t); } catch { /* ignore */ } }); });
       c.pending = [];
+      (c.dropT || []).forEach(clearTimeout); c.dropT = [];
     }
-    const midi = (m) => 440 * Math.pow(2, (m - 69) / 12);
+    // Plays a list of [ms into the breath, ...args] from a breath now `p` ms in, skipping any
+    // already past: fn(at, ...args) gets the audio-clock time. `ripple` (0 to 1) also ripples
+    // the scene as the note sounds.
+    function playList(c, p, list, fn, ripple = 0) {
+      const t0 = ctx.currentTime - p / 1000;
+      list.forEach(([ms, ...args]) => {
+        if (ms < p - 50) return;
+        fn(t0 + Math.max(ms, p) / 1000 + 0.02, ...args);
+        if (ripple) (c.dropT ||= []).push(setTimeout(() => { if (!c.stopped) emit('drop', { pan: args[2] ?? 0, peak: ripple }); }, Math.max(0, ms - p)));
+      });
+    }
+    // Picks n notes evenly from a phrase (keeping its first and last), for shorter or longer breaths.
+    const fit = (phrase, n) => Array.from({ length: n }, (_, i) => phrase[Math.round((i * (phrase.length - 1)) / Math.max(1, n - 1))]);
 
-    // A free reed: strong low harmonics falling off gently, the odd ones a little louder (nasal).
-    let reedWave = null;
-    function reed() {
-      if (reedWave) return reedWave;
-      const n = 40, re = new Float32Array(n + 1), im = new Float32Array(n + 1);
-      for (let i = 1; i <= n; i++) im[i] = Math.pow(i, -1.1) * (i % 2 ? 1 : 0.6);
-      return (reedWave = ctx.createPeriodicWave(re, im));
+    const MAJOR = [1, 9 / 8, 5 / 4, 4 / 3, 3 / 2, 5 / 3, 15 / 8]; // D E F# G A B C#
+    // Scale degree to Hz: degree 0 is D at `base`, 7 the D above, -1 the C# below.
+    const deg = (d, base) => base * MAJOR[((d % 7) + 7) % 7] * Math.pow(2, Math.floor(d / 7));
+    const TALE = [ // the four chords: roots, and the chord tones as scale degrees
+      { root: 0, tones: [0, 2, 4] },  // D
+      { root: 5, tones: [5, 0, 2] },  // B minor
+      { root: 3, tones: [3, 5, 0] },  // G
+      { root: 4, tones: [4, 6, 1] },  // A
+    ];
+    const taleChord = (cycle) => TALE[((cycle % 4) + 4) % 4];
+
+    // A music-box tine: a pure tone with the comb's bright, quickly fading overtones (at about
+    // 3 and 5.4 times) and a tiny metallic tick as it's plucked; the lower the note, the longer
+    // it rings.
+    function tine(c, at, f, vol, pan) {
+      const p = panner(pan); p.connect(c.notes); p.connect(c.echo);
+      const ring = Math.min(4.5, 2 + 900 / f), oscs = [];
+      [[1, 1, ring], [3.01, 0.22, ring * 0.12], [5.42, 0.1, ring * 0.05], [2, 0.06, ring * 0.3]].forEach(([r, a, d]) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.value = f * r;
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.exponentialRampToValueAtTime(vol * a, at + 0.004);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + d);
+        o.connect(g).connect(p); o.start(at); o.stop(at + d + 0.1);
+        oscs.push(o);
+      });
+      later(c, at, oscs);
+    }
+    // The lullaby, an original tune: a rising phrase for each breath in and a falling answer
+    // for each breath out, one pair per chord (scale degrees, 0 is D5).
+    const LULLABY = [
+      { in: [0, 2, 4, 7, 6], out: [9, 7, 4, 2, 4] },
+      { in: [5, 7, 9, 8, 7], out: [8, 7, 5, 2, 1] },
+      { in: [3, 5, 7, 10, 9], out: [9, 8, 7, 5, 3] },
+      { in: [4, 6, 8, 11, 10], out: [10, 8, 6, 4, 1] },
+    ];
+
+    // Storybook's harp: plucked strings made the Karplus-Strong way (a burst of soft noise
+    // circling a loop one period long, a little duller each time round), rendered once per note.
+    const harpBufs = new Map();
+    function harpBuf(f) {
+      const key = Math.round(f * 10);
+      if (harpBufs.has(key)) return harpBufs.get(key);
+      const sr = ctx.sampleRate, len = Math.floor(sr * 5), N = Math.max(2, Math.round(sr / f));
+      const b = ctx.createBuffer(1, len, sr), d = b.getChannelData(0);
+      const decay = Math.pow(0.001, 1 / (f * Math.min(5, 1.5 + 600 / f))); // lower strings ring longer
+      let s = 0;
+      for (let i = 0; i < N; i++) { s += 0.5 * (Math.random() * 2 - 1 - s); d[i] = s; } // a soft, fingertip pluck
+      for (let i = N; i < len; i++) d[i] = decay * 0.5 * (d[i - N] + d[i - N + 1]);
+      let pk = 0; for (let i = 0; i < len; i++) pk = Math.max(pk, Math.abs(d[i]));
+      for (let i = 0; i < len; i++) d[i] /= pk || 1;
+      harpBufs.set(key, b);
+      return b;
+    }
+    function harp(c, at, f, vol, pan) {
+      const s = ctx.createBufferSource(), g = gain(vol), p = panner(pan);
+      s.buffer = harpBuf(f);
+      s.connect(filt('lowpass', Math.min(9000, f * 9))).connect(g).connect(p);
+      p.connect(c.notes); p.connect(c.echo);
+      s.start(at);
+      later(c, at, [s]);
     }
 
-    // Vinyl's electric piano: a two-operator FM tone whose bright "bark" fades into a round
-    // ring, like a Rhodes played softly.
-    const LOFI = [[50, 53, 57, 60, 64], [43, 53, 59, 64, 69], [48, 52, 55, 59, 62], [45, 55, 60, 64, 71]]; // Dm9 G13 Cmaj9 Am9
-    const LOFI_TUNE = [72, 74, 76, 79, 81]; // C D E G A above
-    function epNote(c, at, f, vol, pan) {
-      const p = panner(pan); p.connect(c.keys);
-      const car = ctx.createOscillator(), mod = ctx.createOscillator(), depth = ctx.createGain(), g = ctx.createGain();
-      car.frequency.value = f; mod.frequency.value = f;
-      depth.gain.setValueAtTime(f * 1.1, at);
-      depth.gain.exponentialRampToValueAtTime(f * 0.04, at + 0.7);
-      g.gain.setValueAtTime(0.0001, at);
-      g.gain.exponentialRampToValueAtTime(vol, at + 0.008);
-      g.gain.exponentialRampToValueAtTime(vol * 0.35, at + 0.6);
-      g.gain.exponentialRampToValueAtTime(0.0001, at + 4.5);
-      mod.connect(depth).connect(car.frequency);
-      car.connect(g).connect(p);
-      [car, mod].forEach((o) => { o.start(at); o.stop(at + 4.6); });
-      later(c, at, [car, mod]);
+    // A warm, slow string pad on the tale's chords: two sawtooths a hair apart per note, well
+    // muffled, gliding to each new chord and swelling with the breath.
+    function stringPad(c, level) {
+      const tone = filt('lowpass', 600, 0.4), swell = gain(0.35);
+      swell.connect(tone).connect(gain(level)).connect(c.bed);
+      const pads = [-7, 0, 2, 4].map((dg, i) => [-0.12, 0.12].map((cents) => {
+        const o = osc(c, 'sawtooth', deg(dg, D)); o.detune.value = cents * 100;
+        o.connect(panner([0, -0.4, 0.4, 0][i])).connect(gain(i ? 0.18 : 0.26)).connect(swell);
+        return o;
+      }));
+      return {
+        breathe(p) { breathShape(swell.gain, p, 1, 0.35); breathShape(tone.frequency, p, 1500, 550, true); },
+        chord(ch) {
+          // The bass on the root; the three upper voices take the chord's notes within D3 to C#4, so
+          // each moves only a step or two.
+          const t = ctx.currentTime, notes = [ch.root - 7, ...[...ch.tones].sort((a, b) => a - b)];
+          pads.forEach((pair, i) => pair.forEach((o) => { o.frequency.cancelScheduledValues(t); o.frequency.setTargetAtTime(deg(notes[i], D), t, 0.6); }));
+        },
+      };
     }
 
-    // Purr's throb: a buzzy pulse with many harmonics, run at the purr's 22 to 27 beats a second.
-    let purrWave = null;
-    function purrPulse() {
-      if (purrWave) return purrWave;
-      const n = 48, re = new Float32Array(n + 1), im = new Float32Array(n + 1);
-      for (let i = 1; i <= n; i++) im[i] = Math.pow(i, -0.6);
-      return (purrWave = ctx.createPeriodicWave(re, im));
+    // Glade's wooden flute: a soft, breathy tone (a sine with a little 2nd and 3rd harmonic and
+    // some air at its own pitch), easing in, with a gentle vibrato that grows as the note holds.
+    function flute(c, at, f, dur, vol, pan) {
+      const p = panner(pan), env = ctx.createGain(), oscs = [];
+      p.connect(c.notes); p.connect(c.echo);
+      env.connect(p);
+      env.gain.setValueAtTime(0.0001, at);
+      env.gain.exponentialRampToValueAtTime(vol, at + 0.18);
+      env.gain.setTargetAtTime(vol * 0.8, at + 0.3, 0.6);
+      env.gain.setTargetAtTime(0.0001, at + dur, 0.25);
+      const vib = ctx.createOscillator(), vibDepth = ctx.createGain();
+      vib.frequency.value = 4.6;
+      vibDepth.gain.setValueAtTime(0, at);
+      vibDepth.gain.linearRampToValueAtTime(f * 0.006, at + Math.min(1.2, dur));
+      vib.connect(vibDepth);
+      [[1, 1], [2, 0.12], [3, 0.05]].forEach(([r, a]) => {
+        const o = ctx.createOscillator(), g = gain(a);
+        o.frequency.value = f * r;
+        const vd = gain(r); vibDepth.connect(vd).connect(o.frequency);
+        o.connect(g).connect(env); oscs.push(o);
+      });
+      const air = ctx.createBufferSource();
+      air.buffer = buf('white'); air.loop = true;
+      air.connect(filt('bandpass', f * 2, 3)).connect(gain(0.35)).connect(env);
+      oscs.push(vib, air);
+      oscs.forEach((o) => { o.start(at); o.stop(at + dur + 1.5); });
+      later(c, at, oscs);
     }
-    // A little "mrrp": a short rising-and-falling voice with a rolled-r flutter.
-    function mrrp(c, delay) {
-      const t = ctx.currentTime + delay, o = ctx.createOscillator(), roll = ctx.createOscillator();
-      const flutter = gain(0.5), depth = gain(0.5), env = gain(0), pan = Math.random() * 0.6 - 0.3;
-      o.type = 'sawtooth';
-      o.frequency.setValueAtTime(330, t);
-      o.frequency.linearRampToValueAtTime(560, t + 0.12);
-      o.frequency.linearRampToValueAtTime(470, t + 0.3);
-      roll.frequency.value = 30; roll.connect(depth).connect(flutter.gain);
-      env.gain.setValueAtTime(0.0001, t);
-      env.gain.exponentialRampToValueAtTime(0.05, t + 0.04);
-      env.gain.exponentialRampToValueAtTime(0.03, t + 0.2);
-      env.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
-      o.connect(flutter).connect(filt('bandpass', 850, 1.4)).connect(filt('lowpass', 2200)).connect(env).connect(panner(pan)).connect(c.bed);
-      [o, roll].forEach((x) => { x.start(t); x.stop(t + 0.4); });
-      later(c, t, [o, roll]);
-      setTimeout(() => { if (!c.stopped) emit('drop', { pan, peak: 0.04 }); }, delay * 1000);
-    }
+    const GLADE_TUNES = [ // a pentatonic answer for each breath out (scale degrees, 0 is D5)
+      [4, 2, 1, 0], [5, 4, 2, 4], [7, 5, 4, 2], [4, 5, 2, 1],
+    ];
 
     const BEDS = {
-      shruti(c) {
-        // A shruti box, the little pumped harmonium singers drone with: two reeds a hair apart
-        // on each note (the slow beating is the harmonium's own), D and A over a low D. The
-        // bellows are the breath: breathing in, air rushes in and the reeds swell, brighten and
-        // reach up to A; breathing out, they ease down and the top note settles on F#.
-        const tone = filt('lowpass', 900, 0.6), nasal = filt('peaking', 1100, 1.2), reeds = gain(0.4);
-        nasal.gain.value = 5;
-        reeds.connect(tone).connect(nasal).connect(c.bed);
-        const send = gain(0.35); send.connect(spaceSend()); c.bed.connect(send);
-        const voice = (f, a, pan, out = reeds) => {
-          const g = gain(a); g.connect(panner(pan)).connect(out);
-          [0, 0.55].forEach((d) => { const o = osc(c, 'sine', f + d); o.setPeriodicWave(reed()); o.connect(g); });
-        };
-        voice(D / 2, 0.05, 0);            // D2
-        voice(D, 0.05, -0.2);             // D3
-        voice((D * 3) / 2, 0.04, 0.2);    // A3
-        voice(D * 2, 0.03, -0.1);         // D4
-        const hi = gain(0), lo = gain(0);
-        hi.connect(reeds); lo.connect(reeds);
-        voice(D * 3, 1, 0.3, hi);         // A4, with the breath in
-        voice((D * 5) / 2, 1, -0.3, lo);  // F#4, on the breath out
-        // The bellows' air, heard only while drawing breath in.
-        const airTone = filt('bandpass', 1400, 0.8), air = gain(0);
-        src(c, buf('white')).connect(airTone).connect(air).connect(c.bed);
-        c.breathe = (p) => {
-          breathShape(reeds.gain, p, 1, 0.4);
-          breathShape(tone.frequency, p, 2600, 800, true);
-          breathCurve(hi.gain, p, (b) => 0.022 * b.k);
-          breathCurve(lo.gain, p, (b) => (b.stage === 'out' ? 0.07 * b.k * (1 - b.k) : 0));
-          breathCurve(air.gain, p, (b) => (b.stage === 'in' ? 0.02 * Math.sin(Math.PI * b.f) : 0));
-        };
-      },
-      vinyl(c) {
-        // A lo-fi record: soft electric-piano chords with a little tape wobble, crackle and hiss.
-        // A chord rolls up as each breath in starts (Dm9, G13, Cmaj9, Am9, one per breath), and
-        // two quiet notes fall through the breath out. The record opens up, less muffled, as you
-        // breathe in.
-        const tone = filt('lowpass', 1200, 0.5);
-        tone.connect(c.bed);
-        const send = gain(0.25); send.connect(spaceSend()); c.bed.connect(send);
-        // Wow: the keys pass through a slowly swaying delay, which bends their pitch a hair.
-        c.keys = gain(1);
-        const wow = ctx.createDelay(0.1); wow.delayTime.value = 0.02;
-        lfo(c, 0.45, 0.0012, wow.delayTime);
-        c.keys.connect(wow).connect(tone);
-        src(c, buf('white')).connect(filt('bandpass', 5000, 0.6)).connect(gain(0.006)).connect(c.bed);
-        chain(c, () => 40 + Math.random() ** 2 * 900, () => {
-          const s = ctx.createBufferSource();
-          s.buffer = buf('click'); s.playbackRate.value = 1.5 + Math.random() * 2.5;
-          s.connect(filt('highpass', 1800)).connect(gain(0.004 + Math.random() ** 3 * 0.04))
-            .connect(panner(Math.random() * 1.2 - 0.6)).connect(c.bed);
-          s.start(ctx.currentTime + 0.005);
-        });
+      musicbox(c) {
+        // A wind-up music box playing a lullaby: a little rising phrase through each breath in and
+        // its falling answer through each breath out, a soft low tine on each new chord, in a warm,
+        // faraway room. The quiet string pad underneath swells with the breath.
+        const send = gain(0.6); send.connect(spaceSend()); c.bed.connect(send);
+        c.notes = gain(1); c.notes.connect(c.bed);
+        c.echo = echo(c, 0.22);
+        const pad = stringPad(c, 0.13);
         c.breathe = (p, cycle) => {
           const P = breathPattern;
-          breathShape(tone.frequency, p, 4200, 1100, true);
+          pad.breathe(p);
           callOff(c);
           if (!P.inhale) return; // settling into the session: let what rings, ring
-          const chord = LOFI[((cycle % 4) + 4) % 4], t0 = ctx.currentTime - p / 1000, list = [];
-          chord.forEach((m, i) => list.push([i * 70, m, 0.07 - i * 0.006, (i - 2) * 0.2]));
+          const ch = taleChord(cycle), tune = LULLABY[((cycle % 4) + 4) % 4], list = [];
+          if (p < 300) pad.chord(ch);
+          const D5 = D * 4, n = (ms) => Math.max(3, Math.min(5, Math.round(ms / 1000)));
+          list.push([0, deg(ch.root - 7, D5), 0.05, 0]);
+          // A lilt: each note lands a touch late or early, like a slightly uneven comb.
+          const lilt = (i) => (i % 2 ? 0.06 : -0.03);
+          fit(tune.in, n(P.inhale)).forEach((d, i, a) => list.push([P.inhale * (i / a.length + lilt(i) / a.length), deg(d, D5), 0.06, ((d % 7) / 6) * 0.8 - 0.4]));
           const out = P.inhale + P.holdIn;
-          const picks = [...LOFI_TUNE].sort(() => Math.random() - 0.5).slice(0, 2).sort((a, b) => b - a);
-          if (P.exhale > 0) picks.forEach((m, i) => list.push([out + P.exhale * (0.1 + i * 0.35 + Math.random() * 0.1), m, 0.035, 0.3 - i * 0.6]));
-          list.forEach(([at, m, vol, pan]) => { if (at >= p - 50) epNote(c, t0 + Math.max(at, p) / 1000 + 0.02, midi(m), vol, pan); });
-          if (p < 300) emit('drop', { pan: 0, peak: 0.04 });
+          if (P.exhale > 0) fit(tune.out, n(P.exhale)).forEach((d, i, a) => list.push([out + P.exhale * ((i + 0.15) / a.length), deg(d, D5), 0.05, ((d % 7) / 6) * 0.8 - 0.4]));
+          playList(c, p, list.map(([ms, f, v, pan]) => [Math.max(0, ms), f, v, pan]), (at, f, v, pan) => tine(c, at, f, v * 2.6, pan), 0.03);
         };
       },
-      purr(c) {
-        // A cat asleep on your chest, purring with you: a light rumble on each breath in, a
-        // deeper, fuller one on each breath out, quiet while you hold, and now and then a "mrrp".
-        const env = gain(0), tone = filt('lowpass', 650, 0.7);
-        env.connect(tone).connect(c.bed);
-        const buzz = osc(c, 'sine', 27);
-        buzz.setPeriodicWave(purrPulse());
-        buzz.connect(gain(0.22)).connect(env);
-        // The breathy part: noise pulsed by the same throb.
-        const am = gain(0.5), throb = osc(c, 'sine', 27);
-        throb.connect(gain(0.5)).connect(am.gain);
-        src(c, buf('white')).connect(filt('lowpass', 900)).connect(gain(0.5)).connect(am).connect(env);
-        // A quiet, cosy room.
-        src(c, buf('brown'), 0.8).connect(filt('lowpass', 300)).connect(gain(0.12)).connect(c.bed);
+      storybook(c) {
+        // Once upon a time: a harp rolls up through the chord as each breath in starts, three or
+        // four strings drift back down through each breath out, over a warm string pad that swells
+        // with the breath and moves to the next chord each breath.
+        const send = gain(0.7); send.connect(spaceSend()); c.bed.connect(send);
+        c.notes = gain(1); c.notes.connect(c.bed);
+        c.echo = echo(c, 0.12);
+        const pad = stringPad(c, 0.22);
         c.breathe = (p, cycle) => {
-          const P = breathPattern, edge = (ms, f) => Math.min(1, (f * ms) / 250, ((1 - f) * ms) / 250);
-          const out = (b) => b.stage === 'out' || b.stage === 'hold-out';
-          breathCurve(env.gain, p, (b) => (b.stage === 'in' ? 0.7 * edge(P.inhale, b.f) : b.stage === 'out' ? edge(P.exhale, b.f) : 0));
-          breathCurve(buzz.frequency, p, (b) => (out(b) ? 22 : 27));
-          breathCurve(throb.frequency, p, (b) => (out(b) ? 22 : 27));
-          breathCurve(tone.frequency, p, (b) => (out(b) ? 420 : 650));
+          const P = breathPattern;
+          pad.breathe(p);
           callOff(c);
-          if (p < 300 && cycle > 0 && P.inhale && Math.random() < 0.2) mrrp(c, 0.4);
+          if (!P.inhale) return;
+          const ch = taleChord(cycle), list = [];
+          if (p < 300) pad.chord(ch);
+          // Eight of the chord's notes up from its root (from G3 to D4), about two octaves.
+          const up = [], s = ch.root ? -7 : 0;
+          for (let o = 0; up.length < 8; o += 7) ch.tones.forEach((t) => { const d = (t < ch.root ? t + 7 : t) + o + s; if (up.length < 8) up.push(d); });
+          up.sort((a, b) => a - b);
+          const roll = Math.min(2200, P.inhale * 0.5); // the roll takes up the first half of the breath in
+          up.forEach((d, i) => list.push([(i * roll) / up.length, deg(d, D * 2), 0.11 - i * 0.006, -0.6 + (i * 1.2) / (up.length - 1)]));
+          const out = P.inhale + P.holdIn;
+          if (P.exhale > 0) {
+            const down = [up[7], up[5], up[4], up[2]].slice(0, P.exhale >= 4000 ? 4 : 3);
+            down.forEach((d, i) => list.push([out + (i * P.exhale) / (down.length + 0.5), deg(d, D * 2), 0.07, 0.5 - i * 0.33]));
+          }
+          playList(c, p, list, (at, f, v, pan) => harp(c, at, f, v * 2.8, pan), 0.03);
+        };
+      },
+      glade(c) {
+        // An enchanted wood at night: leaves stir and rise with each breath in, a pinch of fairy
+        // dust sparkles as each breath in starts, and a wooden flute sings a little answer through
+        // each breath out, over the faint string pad.
+        const send = gain(0.65); send.connect(spaceSend()); c.bed.connect(send);
+        c.notes = gain(1); c.notes.connect(c.bed);
+        c.echo = echo(c, 0.18);
+        const pad = stringPad(c, 0.1);
+        const leaves = gain(0.01), rustle = filt('bandpass', 900, 0.7);
+        src(c, buf('white')).connect(rustle).connect(leaves).connect(c.bed);
+        lfo(c, 0.23, 250, rustle.frequency);
+        src(c, buf('brown'), 0.8).connect(filt('lowpass', 250)).connect(gain(0.08)).connect(c.bed);
+        c.breathe = (p, cycle) => {
+          const P = breathPattern;
+          pad.breathe(p);
+          breathShape(leaves.gain, p, 0.06, 0.01);
+          breathShape(rustle.frequency, p, 2400, 700, true);
+          callOff(c);
+          if (!P.inhale) return;
+          const ch = taleChord(cycle), k = ((cycle % 4) + 4) % 4;
+          if (p < 300) pad.chord(ch);
+          const dust = [];
+          [0, 2, 4, 7, 9].forEach((d, i) => dust.push([120 + i * (110 + Math.random() * 50), deg(d, D * 8), 0.016 - i * 0.002, -0.5 + i * 0.25]));
+          playList(c, p, dust, (at, f, v, pan) => celesta(c, at, f, v, 2.2, pan), 0.025);
+          const out = P.inhale + P.holdIn;
+          if (P.exhale > 0) {
+            const tune = fit(GLADE_TUNES[k], P.exhale >= 4000 ? 4 : 3), step = (P.exhale * 0.85) / tune.length;
+            playList(c, p, tune.map((d, i) => [out + i * step, deg(d, D * 4), step / 1000 * (i === tune.length - 1 ? 1.3 : 0.95), 0.035, 0.2 - i * 0.1]),
+              (at, f, dur, v, pan) => flute(c, at, f, dur, v * 2, pan));
+          }
         };
       },
       float(c) {
