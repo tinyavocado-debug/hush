@@ -492,7 +492,7 @@
     function harp(c, at, f, vol, pan) {
       const s = ctx.createBufferSource(), g = gain(vol), p = panner(pan);
       s.buffer = harpBuf(f);
-      s.connect(filt('lowpass', Math.min(9000, f * 9))).connect(g).connect(p);
+      s.connect(filt('lowpass', Math.min(5000, f * 5))).connect(g).connect(p);
       p.connect(c.notes); p.connect(c.echo);
       s.start(at);
       later(c, at, [s]);
@@ -578,13 +578,13 @@
         };
       },
       storybook(c) {
-        // Once upon a time: a harp rolls up through the chord as each breath in starts, three or
-        // four strings drift back down through each breath out, over a warm string pad that swells
-        // with the breath and moves to the next chord each breath.
-        const send = gain(0.7); send.connect(spaceSend()); c.bed.connect(send);
+        // Once upon a time: a harp rolls slowly up through the chord through each breath in, two or
+        // three strings drift back down through each breath out, over a warm string pad that swells
+        // with the breath and moves to the next chord each breath. Kept soft and far off.
+        const send = gain(0.85); send.connect(spaceSend()); c.bed.connect(send);
         c.notes = gain(1); c.notes.connect(c.bed);
         c.echo = echo(c, 0.12);
-        const pad = stringPad(c, 0.22);
+        const pad = stringPad(c, 0.14);
         c.breathe = (p, cycle) => {
           const P = breathPattern;
           pad.breathe(p);
@@ -592,28 +592,28 @@
           if (!P.inhale) return;
           const ch = taleChord(cycle), list = [];
           if (p < 300) pad.chord(ch);
-          // Eight of the chord's notes up from its root (from G3 to D4), about two octaves.
+          // Six of the chord's notes up from its root (from G3 to D4), two octaves.
           const up = [], s = ch.root ? -7 : 0;
-          for (let o = 0; up.length < 8; o += 7) ch.tones.forEach((t) => { const d = (t < ch.root ? t + 7 : t) + o + s; if (up.length < 8) up.push(d); });
+          for (let o = 0; up.length < 6; o += 7) ch.tones.forEach((t) => { const d = (t < ch.root ? t + 7 : t) + o + s; if (up.length < 6) up.push(d); });
           up.sort((a, b) => a - b);
-          const roll = Math.min(2200, P.inhale * 0.5); // the roll takes up the first half of the breath in
-          up.forEach((d, i) => list.push([(i * roll) / up.length, deg(d, D * 2), 0.11 - i * 0.006, -0.6 + (i * 1.2) / (up.length - 1)]));
+          const roll = Math.min(3500, P.inhale * 0.75); // an unhurried roll through most of the breath in
+          up.forEach((d, i) => list.push([(i * roll) / up.length, deg(d, D * 2), 0.08 - i * 0.006, -0.5 + (i * 1.0) / (up.length - 1)]));
           const out = P.inhale + P.holdIn;
           if (P.exhale > 0) {
-            const down = [up[7], up[5], up[4], up[2]].slice(0, P.exhale >= 4000 ? 4 : 3);
-            down.forEach((d, i) => list.push([out + (i * P.exhale) / (down.length + 0.5), deg(d, D * 2), 0.07, 0.5 - i * 0.33]));
+            const down = [up[5], up[3], up[1]].slice(0, P.exhale >= 4000 ? 3 : 2);
+            down.forEach((d, i) => list.push([out + (i * P.exhale) / (down.length + 0.5), deg(d, D * 2), 0.05, 0.4 - i * 0.4]));
           }
-          playList(c, p, list, (at, f, v, pan) => harp(c, at, f, v * 2.8, pan), 0.03);
+          playList(c, p, list, (at, f, v, pan) => harp(c, at, f, v * 2.4, pan), 0.02);
         };
       },
       glade(c) {
-        // An enchanted wood at night: leaves stir and rise with each breath in, a pinch of fairy
-        // dust sparkles as each breath in starts, and a wooden flute sings a little answer through
-        // each breath out, over the faint string pad.
-        const send = gain(0.65); send.connect(spaceSend()); c.bed.connect(send);
+        // An enchanted wood at night: leaves stir softly with each breath in, three faint grains of
+        // fairy dust as each breath in starts, and a wooden flute sings a little answer through
+        // each breath out, over the faint string pad. Kept soft and far off.
+        const send = gain(0.8); send.connect(spaceSend()); c.bed.connect(send);
         c.notes = gain(1); c.notes.connect(c.bed);
         c.echo = echo(c, 0.18);
-        const pad = stringPad(c, 0.1);
+        const pad = stringPad(c, 0.08);
         const leaves = gain(0.01), rustle = filt('bandpass', 900, 0.7);
         src(c, buf('white')).connect(rustle).connect(leaves).connect(c.bed);
         lfo(c, 0.23, 250, rustle.frequency);
@@ -621,20 +621,20 @@
         c.breathe = (p, cycle) => {
           const P = breathPattern;
           pad.breathe(p);
-          breathShape(leaves.gain, p, 0.06, 0.01);
-          breathShape(rustle.frequency, p, 2400, 700, true);
+          breathShape(leaves.gain, p, 0.035, 0.008);
+          breathShape(rustle.frequency, p, 1600, 650, true);
           callOff(c);
           if (!P.inhale) return;
           const ch = taleChord(cycle), k = ((cycle % 4) + 4) % 4;
           if (p < 300) pad.chord(ch);
           const dust = [];
-          [0, 2, 4, 7, 9].forEach((d, i) => dust.push([120 + i * (110 + Math.random() * 50), deg(d, D * 8), 0.016 - i * 0.002, -0.5 + i * 0.25]));
-          playList(c, p, dust, (at, f, v, pan) => celesta(c, at, f, v, 2.2, pan), 0.025);
+          [2, 4, 7].forEach((d, i) => dust.push([150 + i * (260 + Math.random() * 120), deg(d, D * 8), 0.009 - i * 0.0015, -0.4 + i * 0.4]));
+          playList(c, p, dust, (at, f, v, pan) => celesta(c, at, f, v, 2.2, pan), 0.015);
           const out = P.inhale + P.holdIn;
           if (P.exhale > 0) {
-            const tune = fit(GLADE_TUNES[k], P.exhale >= 4000 ? 4 : 3), step = (P.exhale * 0.85) / tune.length;
+            const tune = fit(GLADE_TUNES[k], P.exhale >= 6000 ? 4 : 3), step = (P.exhale * 0.85) / tune.length;
             playList(c, p, tune.map((d, i) => [out + i * step, deg(d, D * 4), step / 1000 * (i === tune.length - 1 ? 1.3 : 0.95), 0.035, 0.2 - i * 0.1]),
-              (at, f, dur, v, pan) => flute(c, at, f, dur, v * 2, pan));
+              (at, f, dur, v, pan) => flute(c, at, f, dur, v * 1.4, pan));
           }
         };
       },
