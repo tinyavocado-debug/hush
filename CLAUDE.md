@@ -3,14 +3,15 @@
 - **Start:** `python3 -m http.server 8766` from the repo root (no build step)
 - **Port:** 8766
 - **Main URL:** http://localhost:8766/ (rooms: `/orbit/`, `/ember/`, `/pond/`)
+- **Usage stats:** http://localhost:8766/stats/ reads GoatCounter (tinyavocado.goatcounter.com) with a read-only API token kept in that browser. GoatCounter rate-limits its API (429), so the page spaces its calls, retries, and caches each range for 5 minutes. Events are sent from `shared/analytics.js` (`begin/<room>/<sound>/<breath>/<min>m`, `finished|ended-early/<room>/<min>m`); localhost visits aren't counted.
 
 ## Names
 
 - **Hush**: the app. A room picker, then one room per scene.
-- **Orbit** (was Still): deep space and the breathing dot sphere. Sounds: Float, Voyage, Silence (`ocean` and `rain` in code).
+- **Orbit** (was Still): deep space and the breathing dot sphere. Sounds: Float, Voyage, Silence (`float` and `voyage` in code; since 2026-11-15 star-pad music in the spirit of the loving-kindness app, in D. They were ocean and rain before: `ocean` is still in core.js, and Pond keeps `rain`).
 - **Ember**: incense stick that burns down. Sounds: Drone (`temple` in code), Hearth, Silence.
 - **Pond**: a koi pond seen from above (lily pads, lotus, three koi). Was **Cairn** (stones at a lake) until 2026-11-07. Sounds: Garden, Rain, Silence.
-- **Breath menu**: a button at the top right (setup screen, and with the session controls) showing the current choice; it opens a menu with **Your own pace** (Short / Steady / Long, plus **Hold**) and the one-word **techniques** below (`Spa.TECHNIQUES` in `shared/core.js`: Balance, Recovery, Concentration, Stillness, Discipline, Control, Advanced, Alertness, Body, Movement, Senses, Activating). Hold a technique to favorite it: an outline draws round it and it moves to the top. The choice and favorites are shared by all rooms and remembered; first visit starts Steady. Still being tried (2026-11-08).
+- **Modes**: on every room's setup screen, above the sounds, **Sleep / Steady / Breath** as three **orbs**, each breathing at its own mode's rhythm (added 2026-11-16; Orbs chosen the same day over a pill row, a swipeable big word, and a moon dragged along a rail that waxed from crescent to full). **Sleep** breathes at the Long pace and ends with no bells and no vibration (its sound fades over about 20s). **Steady** and **Breath** each open the **breath menu** pop-up with just their own choices: Steady has Short / Steady / Long plus **Hold**; Breath has the one-word **techniques** (`Spa.TECHNIQUES` in `shared/core.js`: Balance, Recovery, Concentration, Stillness, Discipline, Control, Advanced, Alertness, Body, Movement, Senses, Activating). A pill under the orbs shows the current choice and reopens the pop-up. Hold a technique to favorite it: an outline draws round it and it moves to the top. During a session the button at the top right (with the controls) opens the same pop-up; it's hidden in Sleep. The mode, pace and technique are shared by all rooms and remembered; first visit starts Steady.
 
 ## Settled
 

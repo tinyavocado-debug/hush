@@ -16,7 +16,7 @@
     { id: 'balance', word: 'Balance', name: 'Sama Vritti', sub: 'Equal breathing', t: [4, 0, 4, 0],
       note: 'Builds a consistent breathing rhythm. Useful for centering yourself before work, yoga, or meditation.' },
     { id: 'recovery', word: 'Recovery', name: 'Visama Vritti', sub: 'Extended exhale', t: [4, 0, 8, 0],
-      note: 'Traditionally used for settling the mind and reducing agitation. A gentler starting pattern is 4–6.' },
+      note: 'Traditionally used for settling the mind and reducing agitation. If eight counts out feels long, Steady (4 in, 6 out) is a gentler start.' },
     { id: 'concentration', word: 'Concentration', name: 'Antara Kumbhaka', sub: 'Inhale retention', t: [4, 2, 4, 0],
       note: 'Introduces a pause after inhaling. Traditionally used to cultivate attention, steadiness, and control over the breath.' },
     { id: 'stillness', word: 'Stillness', name: 'Bahya Kumbhaka', sub: 'Exhale retention', t: [4, 0, 4, 2],
@@ -26,7 +26,7 @@
     { id: 'control', word: 'Control', name: 'Visama Vritti', sub: 'Graduated retention', t: [4, 2, 6, 0],
       note: 'A mixed ratio that integrates inhalation retention with a longer exhale. A useful intermediate practice for learning measured breath control.' },
     { id: 'advanced', word: 'Advanced', name: 'Classical 1:4:2 ratio', sub: '', t: [4, 16, 8, 0],
-      note: 'A traditional pranayama ratio associated with deeper concentration and mastery of retention. Not a beginner exercise; the long retention should be learned with qualified instruction.' },
+      note: 'A traditional pranayama ratio (the Gheranda Samhita counts it 16 : 64 : 32), associated with deeper concentration and mastery of retention. Not a beginner exercise: learn the long hold with a qualified teacher, and skip it if you are pregnant or have heart or blood-pressure problems.' },
     { id: 'alertness', word: 'Alertness', name: 'Visama Vritti', sub: 'Extended inhale', t: [6, 0, 4, 0],
       note: 'An inhale-emphasized variation sometimes used for a more activating experience. Evidence for a reliable alertness boost is limited.' },
     { id: 'body', word: 'Body', name: 'Three-part breathing', sub: 'Progressive', t: [6, 0, 6, 0], parts: ['belly', 'ribs', 'chest'],
@@ -36,7 +36,7 @@
     { id: 'senses', word: 'Senses', name: 'Bhramari', sub: 'Humming exhale', t: [4, 0, 8, 0], say: { out: 'hum' },
       note: 'The extended humming exhale provides vibration and an auditory anchor. Traditionally used for inward attention and quieting mental chatter.' },
     { id: 'activating', word: 'Activating', name: 'Bhastrika', sub: 'Bellows breathing', t: [1, 0, 1, 0], say: { in: 'in', out: 'out' },
-      note: '' },
+      note: 'Quick, forceful breaths in and out through the nose, pumped from the belly, traditionally used to energize. Stop if you feel dizzy. Usually advised against with high blood pressure, heart disease, epilepsy, hernia, or pregnancy.' },
   ];
   Spa.technique = (id) => Spa.TECHNIQUES.find((x) => x.id === id) || null;
   // Your own pace: how long each breath in and out lasts, and an optional hold after each.
@@ -301,7 +301,299 @@
       setTimeout(() => emit('chime', { f }), (delay + 0.02) * 1000);
     }
 
+    /* Orbit's sounds: whimsical and cosmic. Pure sine tones in just intonation, in D lydian (the
+       raised 4th, G#, is the floating "wonder" sound), soft celesta notes bouncing left and right
+       in an echo, and a long warm reverb. No detuned pairs or volume wobbles: the only movement is
+       the visuals' breath curve. */
+    const D = 146.83; // D3; every Orbit note is a just ratio of it
+    const ORBIT_CHORDS = [
+      [3 / 2, 2, 3, 9 / 2, 45 / 8, 6],          // D lydian: A3 D4 A4 E5 G#5 A5
+      [5 / 3, 2, 9 / 4, 45 / 16, 10 / 3, 9 / 2], // E over D: B3 D4 E4 G#4 B4 E5
+    ];
+    const SPARKLES = [ // high chord tones for Float's runs, one list per chord
+      [6, 8, 9, 45 / 4, 12],        // A5 D6 E6 G#6 A6
+      [45 / 8, 20 / 3, 8, 9, 45 / 4], // G#5 B5 D6 E6 G#6
+    ];
+    const LYDIAN = [4, 9 / 2, 5, 45 / 8, 6, 20 / 3, 8]; // D5 E5 F#5 G#5 A5 B5 D6, for Voyage's tunes
+    const UP = [[0, 2, 4, 5, 6], [0, 1, 2, 4, 6], [2, 4, 3, 5, 6], [0, 4, 2, 5, 4]];
+    const DOWN = [[6, 4, 5, 2, 0], [6, 5, 3, 2, 0], [5, 4, 2, 1, 0], [4, 6, 3, 2, 0]];
+
+    // A long (6 s), warm, wide reverb, made once and fed only by Orbit's sounds. Smoothed noise,
+    // different in each ear. It returns through the ambience gain, so dim and mute reach it.
+    let space = null;
+    function spaceSend() {
+      if (space) return space;
+      const len = Math.floor(ctx.sampleRate * 6), b = ctx.createBuffer(2, len, ctx.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = b.getChannelData(ch);
+        let s = 0;
+        for (let i = 0; i < len; i++) { s += 0.35 * (Math.random() * 2 - 1 - s); d[i] = s * Math.pow(1 - i / len, 2.5); }
+      }
+      const conv = ctx.createConvolver();
+      conv.buffer = b;
+      space = gain(0.9);
+      space.connect(conv).connect(ambienceGain);
+      return space;
+    }
+
+    // A ping-pong echo into the bed: each repeat a little softer and darker, left then right.
+    function echo(c, wet) {
+      const input = gain(1), out = gain(wet), l = ctx.createDelay(2), r = ctx.createDelay(2);
+      l.delayTime.value = 0.42; r.delayTime.value = 0.63;
+      const lr = gain(0.5), rl = gain(0.5), dark = filt('lowpass', 2600);
+      input.connect(l);
+      l.connect(lr).connect(r); r.connect(dark).connect(rl).connect(l);
+      l.connect(panner(-0.75)).connect(out); r.connect(panner(0.75)).connect(out);
+      out.connect(c.bed);
+      return input;
+    }
+
+    // A celesta-like note: a sine with a quiet, quickly fading 4th and 2nd harmonic, a soft
+    // strike and a ring. Goes dry to `dest` and into the echo.
+    function celesta(c, at, f, vol, ring, pan = 0) {
+      const p = panner(pan); p.connect(c.notes); p.connect(c.echo);
+      [[1, 1, ring], [4, 0.16, ring * 0.15], [2, 0.08, ring * 0.4]].forEach(([r, a, d]) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.value = f * r;
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.exponentialRampToValueAtTime(vol * a, at + 0.008);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + d);
+        o.connect(g).connect(p); o.start(at); o.stop(at + d + 0.1);
+      });
+    }
+
+    // A wide pad on one of ORBIT_CHORDS: one steady sine per note. The three low notes hold still;
+    // the three high ones go through `bloom`, which swells with the breath. Also sets up the bed's
+    // notes, echo and reverb send.
+    function orbitPad(c, level, wet) {
+      const send = gain(wet); send.connect(spaceSend());
+      c.bed.connect(send);
+      c.notes = gain(1); c.notes.connect(c.bed);
+      c.echo = echo(c, 0.4);
+      const tone = filt('lowpass', 900, 0.3), bloom = gain(0.3);
+      tone.connect(gain(level)).connect(c.bed);
+      const levels = [1, 0.75, 0.5, 0.45, 0.3, 0.2], sum = 2.2;
+      const pans = [0, -0.35, 0.35, -0.2, -0.5, 0.5];
+      const voices = ORBIT_CHORDS[0].map((r, i) => {
+        const g = gain(levels[i] / sum), pn = panner(pans[i]);
+        g.connect(pn).connect(i < 3 ? tone : bloom);
+        const o = osc(c, 'sine', D * r); o.connect(g);
+        return o;
+      });
+      bloom.connect(tone);
+      c.chord = 0;
+      return {
+        breathe(p) {
+          breathShape(tone.frequency, p, 1900, 650, true);
+          breathShape(bloom.gain, p, 0.85, 0.3);
+        },
+        next(sec) {
+          c.chord = 1 - c.chord;
+          const t = ctx.currentTime;
+          ORBIT_CHORDS[c.chord].forEach((r, i) => {
+            voices[i].frequency.cancelScheduledValues(t);
+            voices[i].frequency.setTargetAtTime(D * r, t, sec);
+          });
+        },
+      };
+    }
+
+    // Plays notes at offsets (ms into the breath) from a breath that is now `p` ms in; skips any
+    // already past and ripples the scene with each.
+    function sprinkle(c, p, list) {
+      const t0 = ctx.currentTime - p / 1000;
+      list.forEach(([at, f, vol, ring, pan]) => {
+        if (at < p - 50) return;
+        celesta(c, t0 + Math.max(at, p) / 1000 + 0.02, f, vol, ring, pan);
+        setTimeout(() => { if (!c.stopped) emit('drop', { pan, peak: vol * 0.7 }); }, Math.max(0, at - p));
+      });
+    }
+
+    /* Trial (2026-11-16, round 4): the loving-kindness app's background music, ported from its
+       src/lib/sound/meditationSounds.ts. G major in just intonation: a wide pad of sine pairs a hair
+       apart going round four warm chords, a slow music-box figure of soft crystal notes on top, now
+       and then a faint high twinkle, all in the long warm reverb. Here the pad swells with the
+       breath and moves to the next chord as each breath in starts; at the Steady pace (10 s a
+       breath) that is exactly the app's own tempo. */
+    const G = 196; // G3
+    const KIND_CHORDS = [ // G maj9, E min9, C maj9 #11, D 6/9: pad voices low to high, and the four notes the figure plays
+      { pad: [1, 3 / 2, 9 / 4, 5 / 2, 3, 15 / 4], arp: [3, 4, 5, 9 / 2] },
+      { pad: [5 / 6, 3 / 2, 2, 5 / 2, 3, 15 / 4], arp: [5 / 2, 10 / 3, 4, 3] },
+      { pad: [4 / 3, 5 / 3, 2, 5 / 2, 3, 15 / 4], arp: [8 / 3, 10 / 3, 4, 5] },
+      { pad: [3 / 2, 15 / 8, 9 / 4, 5 / 2, 10 / 3, 15 / 4], arp: [3, 15 / 4, 9 / 2, 10 / 3] },
+    ];
+    // Which arp note sounds on each 16th of a breath (null is a rest): a gently lopsided figure, an
+    // answer, and space at the end for the chord to change. The app's pattern, note for note.
+    const KIND_PATTERN = [0, null, null, 1, 2, null, 3, null, 2, null, 1, null, 3, null, null, null];
+    const KIND_ARP_PANS = [-0.3, 0.3, -0.12, 0.12];
+    const KIND_LEVELS = [1, 0.75, 0.35, 0.5, 0.25, 0.18], KIND_PANS = [0, -0.35, -0.15, 0.35, -0.5, 0.5];
+    const KIND_DRIFT = [0.031, 0.043, 0.067, 0.057, 0.051, 0.023];
+    const KIND_TWINKLES = [4, 9 / 2, 5, 6, 20 / 3, 8].map((r) => G * r); // G5 A5 B5 D6 E6 G6
+    const KIND_VOL = 0.16; // the app's is 0.12, under a voice
+
+    // A soft crystal note: a pure tone with a quiet 2nd and 3rd harmonic, a gentle (40 ms) attack
+    // and a long ring; each partial a pair a hair apart for a slow, calm shimmer. Notes not yet
+    // started are remembered, so the next breath can call them off.
+    function kindNote(c, at, f, vol, ring, pan) {
+      const p = panner(pan), oscs = [];
+      p.connect(c.pulse);
+      [[1, 1], [2, 0.22], [3, 0.07]].forEach(([r, a]) => {
+        const d = ring / r;
+        [0, 0.0004].forEach((det) => {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.frequency.value = f * r * (1 + det);
+          g.gain.setValueAtTime(0.0001, at);
+          g.gain.exponentialRampToValueAtTime((vol * a) / 2, at + 0.04);
+          g.gain.exponentialRampToValueAtTime(0.0001, at + d);
+          o.connect(g).connect(p); o.start(at); o.stop(at + d + 0.1);
+          oscs.push(o);
+        });
+      });
+      c.pending.push({ at, oscs });
+    }
+    // Calls off notes planned for later (a new breath plans its own); ones already ringing ring on.
+    function kindCancel(c) {
+      const t = ctx.currentTime + 0.02;
+      c.pending.forEach((n) => { if (n.at > t) n.oscs.forEach((o) => { try { o.stop(t); } catch { /* ignore */ } }); });
+      c.pending = [];
+      c.dropT.forEach(clearTimeout); c.dropT = [];
+    }
+    // Plays notes at offsets (ms into the breath) from a breath that is now `p` ms in, skipping any
+    // already past. A null frequency is a twinkle: a random high note, which also ripples the scene.
+    function kindPlay(c, p, list) {
+      const t0 = ctx.currentTime - p / 1000;
+      list.forEach(([at, f, vol, ring, pan]) => {
+        if (at < p - 50) return;
+        const t = t0 + Math.max(at, p) / 1000 + 0.02;
+        if (f) { kindNote(c, t, f, vol, ring, pan); return; }
+        const tf = KIND_TWINKLES[Math.floor(Math.random() * KIND_TWINKLES.length)];
+        const tv = 0.08 + Math.random() * 0.06, tp = Math.random() * 1.4 - 0.7;
+        kindNote(c, t, tf, tv, 5, tp);
+        c.dropT.push(setTimeout(() => { if (!c.stopped) emit('drop', { pan: tp, peak: tv * KIND_VOL * 1.5 }); }, Math.max(0, at - p)));
+      });
+    }
+    // The pad: six voices, each two sines a hair apart (a beat every 10 to 20 s, felt more than
+    // heard), each drifting slowly in level as in the app. The whole pad swells with the breath.
+    function kindPad(c) {
+      const send = gain(0.75); send.connect(spaceSend()); c.bed.connect(send);
+      const swell = gain(0.4), tone = filt('lowpass', 1100, 0.3);
+      swell.connect(tone).connect(gain(KIND_VOL)).connect(c.bed);
+      const total = KIND_LEVELS.reduce((s, x) => s + x, 0);
+      const voices = KIND_CHORDS[0].pad.map((r, i) => {
+        const g = gain(KIND_LEVELS[i] / total);
+        g.connect(panner(KIND_PANS[i])).connect(swell);
+        lfo(c, KIND_DRIFT[i], (KIND_LEVELS[i] / total) * 0.35, g.gain);
+        return [0, 0.0003].map((det) => { const o = osc(c, 'sine', G * r * (1 + det)); o.connect(g); return [o, det]; });
+      });
+      c.pulse = gain(KIND_VOL); c.pulse.connect(c.bed);
+      c.pending = []; c.dropT = [];
+      return {
+        // Fullest at the top of the breath in, softest as the breath out ends.
+        breathe(p) { breathShape(swell.gain, p, 1, 0.4); breathShape(tone.frequency, p, 2100, 1100, true); },
+        // Glides into chord `i` (the app glides with a 0.35 s time constant).
+        chord(i) {
+          const t = ctx.currentTime;
+          KIND_CHORDS[i].pad.forEach((r, j) => voices[j].forEach(([o, det]) => {
+            o.frequency.cancelScheduledValues(t); o.frequency.setTargetAtTime(G * r * (1 + det), t, 0.35);
+          }));
+        },
+      };
+    }
+    // Shared start of each breath for the three: shape the pad, call off old notes, and on a new
+    // breath move to its chord. Returns the chord, or null while settling into the session.
+    function kindBreath(c, pad, p, cycle) {
+      pad.breathe(p);
+      kindCancel(c);
+      if (!breathPattern.inhale) return null; // the lone settling breath out: let what rings, ring
+      const i = ((cycle % 4) + 4) % 4;
+      if (p < 300) pad.chord(i);
+      return KIND_CHORDS[i];
+    }
+
     const BEDS = {
+      // Round 4: the loving-kindness app's music, three ways.
+      kindness(c) {
+        // As in the app: the music-box figure spread over the whole breath, a faint twinkle now
+        // and then in its rests, the chords going round one per breath.
+        const pad = kindPad(c);
+        c.breathe = (p, cycle) => {
+          const chord = kindBreath(c, pad, p, cycle);
+          if (!chord) return;
+          const step = breathPattern.cycle / 16, list = [];
+          KIND_PATTERN.forEach((n, s) => {
+            if (n !== null) list.push([s * step, G * chord.arp[n], 0.14 * (s % 8 ? 0.8 : 1) * (0.85 + Math.random() * 0.15), 3.5, KIND_ARP_PANS[n]]);
+            else if (Math.random() < 0.1) list.push([s * step, null]);
+          });
+          kindPlay(c, p, list);
+        };
+      },
+      rise(c) {
+        // The same notes, following the breath: they climb the chord through each breath in, a
+        // twinkle while holding, and step back down, softer and longer, through each breath out.
+        const pad = kindPad(c);
+        c.breathe = (p, cycle) => {
+          const chord = kindBreath(c, pad, p, cycle);
+          if (!chord) return;
+          const P = breathPattern, up = [...chord.arp].sort((a, b) => a - b), list = [];
+          if (P.inhale > 0) up.forEach((r, j) => list.push([(j * P.inhale) / 4, G * r, 0.14 * (j ? 0.85 : 1), 3.5, KIND_ARP_PANS[j]]));
+          if (P.holdIn > 0) list.push([P.inhale + P.holdIn * 0.4, null]);
+          const out = P.inhale + P.holdIn;
+          if (P.exhale > 0) [...up].reverse().forEach((r, j) => list.push([out + (j * P.exhale) / 4, G * r, 0.11, 5, KIND_ARP_PANS[3 - j]]));
+          kindPlay(c, p, list);
+        };
+      },
+      night(c) {
+        // Just the pad and the twinkles: two or three faint high notes at loose moments each breath.
+        const pad = kindPad(c);
+        c.breathe = (p, cycle) => {
+          if (!kindBreath(c, pad, p, cycle)) return;
+          const n = 2 + (Math.random() < 0.4 ? 1 : 0), list = [];
+          for (let i = 0; i < n; i++) list.push([breathPattern.cycle * ((i + Math.random()) / n), null]);
+          kindPlay(c, p, list.sort((a, b) => a[0] - b[0]));
+        };
+      },
+      float(c) {
+        // A floating wonder chord that swells with each breath in, swaying to the chord a step up
+        // every second breath. A quick sparkle run rises as each breath in starts, and a slower
+        // one drifts down as each breath out starts, echoing off into space.
+        const pad = orbitPad(c, 0.3, 0.8);
+        c.breathe = (p, cycle) => {
+          const P = breathPattern;
+          pad.breathe(p);
+          if (p < 300 && cycle > 0 && cycle % 2 === 0) pad.next(1.6);
+          const notes = SPARKLES[c.chord], list = [];
+          if (P.inhale > 0) notes.forEach((r, i) => list.push([i * (130 + Math.random() * 40), D * r, 0.024 - i * 0.002, 2.4, -0.5 + i * 0.25]));
+          const out = P.inhale + P.holdIn;
+          if (P.exhale > 0) [4, 2, 0].forEach((n, i) => list.push([out + i * 320, D * notes[n], 0.018, 3, 0.4 - i * 0.4]));
+          sprinkle(c, p, list);
+        };
+      },
+      voyage(c) {
+        // A little celesta tune that climbs through each breath in and wanders home through each
+        // breath out, a different tune each breath, over the wonder chord and a soft solar wind
+        // that rises with the breath in.
+        const pad = orbitPad(c, 0.16, 0.75);
+        const band = filt('bandpass', 500, 1.1), wind = gain(0.01);
+        src(c, buf('white')).connect(band).connect(wind).connect(c.bed);
+        c.breathe = (p, cycle) => {
+          const P = breathPattern;
+          pad.breathe(p);
+          breathShape(band.frequency, p, 1700, 380, true);
+          breathShape(wind.gain, p, 0.05, 0.008);
+          if (p < 300 && cycle > 0) pad.next(0.9);
+          const k = ((cycle % 4) + 4) % 4, list = [];
+          const tune = (start, dur, shape, vol, ring) => {
+            const n = Math.max(3, Math.min(5, Math.round(dur / 1100)));
+            for (let i = 0; i < n; i++) {
+              const deg = shape[Math.round((i * 4) / (n - 1))];
+              list.push([start + (i * dur) / n, D * LYDIAN[deg], vol * (i === 0 ? 1.15 : 1), ring, (deg / 6) * 0.9 - 0.45]);
+            }
+          };
+          if (P.inhale > 0) tune(0, P.inhale, UP[k], 0.05, 2.8);
+          if (P.exhale > 0) tune(P.inhale + P.holdIn, P.exhale, DOWN[k], 0.045, 3.4);
+          sprinkle(c, p, list);
+        };
+      },
       ocean(c) {
         src(c, buf('brown'), 0.9).connect(filt('lowpass', 180)).connect(gain(0.55)).connect(c.bed);
         const surf = filt('lowpass', 420, 0.5), swell = gain(0.3);
@@ -538,16 +830,48 @@
     openingEl.textContent = 'breathe in';
     $('.session').appendChild(openingEl);
 
-    // The breath menu, opened from a button at the top right (on the setup screen, and with the
-    // session controls). It holds your own pace (Short / Steady / Long, and Hold) and the
-    // breathing techniques; a change mid-session starts with the next breath.
+    // The session's mode, picked on the setup screen:
+    //   Sleep: breathes at the Long pace, and ends with no bells and no vibration.
+    //   Steady: your own pace (Short / Steady / Long, and Hold), chosen right below.
+    //   Breath: a breathing technique, chosen from the breath menu, which pops up.
+    // During a session the button at the top right (with the controls) opens the menu for the
+    // mode's own choices; a change mid-session starts with the next breath.
     // Holding a technique draws an outline round it and makes it a favorite, which moves it to
     // the top; holding a favorite again unwinds the outline.
+    const MODES = { sleep: 'Sleep', steady: 'Steady', breath: 'Breath' };
     const prefs = Spa.store('breath'); // shared by every room
     let favs = prefs.get('favorites', []).filter((id) => Spa.technique(id));
-    let lastPace = Spa.PACES[prefs.get('pace')] ? prefs.get('pace') : 'steady'; // your own pace, kept while a technique is chosen
+    let lastPace = Spa.PACES[prefs.get('pace')] ? prefs.get('pace') : 'steady';
     let lastHold = !!prefs.get('hold', false);
-    Spa.setPattern(prefs.get('choice', lastPace), lastHold);
+    const oldTech = Spa.technique(prefs.get('choice')) ? prefs.get('choice') : null; // from before modes
+    let lastTech = Spa.technique(prefs.get('tech')) ? prefs.get('tech') : oldTech || 'balance';
+    let mode = MODES[prefs.get('mode')] ? prefs.get('mode') : oldTech ? 'breath' : 'steady';
+    const modePattern = (m = mode) => (m === 'sleep' ? ['long', false] : m === 'breath' ? [lastTech] : [lastPace, lastHold]);
+    // A mode's pattern, without choosing it.
+    const patternFor = (m) => { const keep = Spa.pattern; Spa.setPattern(...modePattern(m)); const P = Spa.pattern; Spa.pattern = keep; return P; };
+    Spa.setPattern(...modePattern());
+
+    const paceRow = `
+      <div class="pace-row">
+        <div class="paces" role="radiogroup" aria-label="Pace">
+          ${Object.entries(Spa.PACES).map(([k, v]) => `<button type="button" role="radio" data-pace="${k}">${v.label}</button>`).join('')}
+        </div>
+        <button type="button" class="hold-toggle" aria-pressed="false">Hold</button>
+      </div>`;
+
+    // On the setup screen, above the sounds: the three modes as orbs, each breathing at its own
+    // mode's rhythm, and below them the mode's choice (Steady and Breath reopen their pop-up).
+    const modeBox = document.createElement('div');
+    modeBox.className = 'mode';
+    modeBox.innerHTML = `
+      <div class="modes-orbs" role="radiogroup" aria-label="Session">
+        ${Object.entries(MODES).map(([k, v]) => `<button type="button" role="radio" data-mode="${k}"><span class="mo-orb"><i></i></span><span class="mo-word">${v}</span></button>`).join('')}
+      </div>
+      <div class="mode-more">
+        <button type="button" class="mode-pick" aria-haspopup="dialog"><span></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+        <p class="mode-sleep">Ends softly · no bells, no buzz</p>
+      </div>`;
+    $('.options').prepend(modeBox);
 
     const opener = document.createElement('button');
     opener.type = 'button';
@@ -563,19 +887,18 @@
     menu.setAttribute('aria-label', 'Breath');
     menu.innerHTML = `
       <div class="bmenu-panel">
-        <p class="eyebrow">Your own pace</p>
-        <div class="bmenu-own">
-          <div class="paces" role="radiogroup" aria-label="Pace">
-            ${Object.entries(Spa.PACES).map(([k, v]) => `<button type="button" role="radio" data-pace="${k}">${v.label}</button>`).join('')}
+        <div class="bmenu-pace">
+          <p class="eyebrow">Your own pace</p>
+          ${paceRow}
+        </div>
+        <div class="bmenu-tech">
+          <p class="eyebrow">Breathe for</p>
+          <div class="bmenu-grid" role="radiogroup" aria-label="Technique">
+            ${Spa.TECHNIQUES.map((T) => `<button type="button" role="radio" data-tech="${T.id}">
+              <svg class="bmenu-ring" aria-hidden="true"><rect pathLength="100"/></svg><span>${T.word}</span></button>`).join('')}
           </div>
-          <button type="button" class="hold-toggle" aria-pressed="false">Hold</button>
+          <p class="bmenu-tip">Hold one to make it a favorite</p>
         </div>
-        <p class="eyebrow bmenu-or">Or breathe for</p>
-        <div class="bmenu-grid" role="radiogroup" aria-label="Technique">
-          ${Spa.TECHNIQUES.map((T) => `<button type="button" role="radio" data-tech="${T.id}">
-            <svg class="bmenu-ring" aria-hidden="true"><rect pathLength="100"/></svg><span>${T.word}</span></button>`).join('')}
-        </div>
-        <p class="bmenu-tip">Hold one to make it a favorite</p>
         <div class="bmenu-about" aria-live="polite">
           <p class="bmenu-name"></p><p class="bmenu-counts"></p><p class="bmenu-note"></p>
         </div>
@@ -585,21 +908,43 @@
     const grid = menu.querySelector('.bmenu-grid');
     const techBtn = Object.fromEntries([...grid.children].map((b) => [b.dataset.tech, b]));
     menu.querySelectorAll('[data-pace]').forEach((b) => b.addEventListener('click', () => {
-      setBreath(b.dataset.pace, Spa.pattern.pace ? Spa.pattern.hold : lastHold);
+      setBreath(b.dataset.pace, lastHold);
       audio.ensure(); audio.tick(1.2);
     }));
-    // Hold toggles the hold on your own pace; from a technique, it goes to your pace with a hold.
-    menu.querySelector('.hold-toggle').addEventListener('click', () => {
-      setBreath(lastPace, Spa.pattern.pace ? !Spa.pattern.hold : true);
+    menu.querySelectorAll('.hold-toggle').forEach((b) => b.addEventListener('click', () => {
+      setBreath(lastPace, !lastHold);
       audio.ensure(); audio.tick(1.2);
-    });
+    }));
+    function chooseMode(m) {
+      const again = m === mode;
+      mode = m;
+      prefs.set('mode', m);
+      setBreath(...modePattern());
+      audio.ensure(); audio.tick(1.3);
+      if (m !== 'sleep' && !again) openMenu();
+    }
+    modeBox.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => chooseMode(b.dataset.mode)));
+    const MODE_KEYS = Object.keys(MODES);
+
+    // Orbs: each orb swells and settles with its own mode's breath.
+    let orbPat = {};
+    const orbBtns = [...modeBox.querySelectorAll('.modes-orbs [data-mode]')];
+    (function orbLoop(now) {
+      requestAnimationFrame(orbLoop);
+      if (st.phase !== 'setup') return;
+      orbBtns.forEach((b) => b.style.setProperty('--k', Spa.breathAt(now, orbPat[b.dataset.mode]).k.toFixed(3)));
+    })(performance.now());
+
+    modeBox.querySelector('.mode-pick').addEventListener('click', openMenu);
 
     function openMenu() {
+      menuFrom = document.activeElement?.closest?.('button') || opener;
       menu.classList.add('open');
       sizeRings();
       menu.querySelector('[aria-checked="true"]')?.focus({ preventScroll: true });
     }
-    function closeMenu() { menu.classList.remove('open'); opener.focus({ preventScroll: true }); }
+    let menuFrom = opener; // where focus goes back to
+    function closeMenu() { menu.classList.remove('open'); menuFrom.focus({ preventScroll: true }); }
     opener.addEventListener('click', openMenu);
     menu.querySelector('.bmenu-done').addEventListener('click', closeMenu);
     menu.addEventListener('click', (e) => { if (e.target === menu) closeMenu(); });
@@ -689,7 +1034,13 @@
       opener.querySelector('.breath-open-word').textContent = T ? T.word : `${Spa.PACES[P.pace].label}${P.hold ? ' · Hold' : ''}`;
       opener.setAttribute('aria-label', `Breath: ${opener.textContent}`);
       menu.querySelectorAll('[data-pace]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.pace === P.pace)));
-      menu.querySelector('.hold-toggle').setAttribute('aria-pressed', String(!!P.pace && P.hold));
+      menu.querySelectorAll('.hold-toggle').forEach((b) => b.setAttribute('aria-pressed', String(!!P.pace && P.hold)));
+      modeBox.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mode === mode)));
+      const pick = mode === 'breath' ? Spa.technique(lastTech).word : `${Spa.PACES[lastPace].label}${lastHold ? ' · Hold' : ''}`;
+      modeBox.querySelector('.mode-pick span').textContent = pick;
+      modeBox.querySelector('.mode-pick').setAttribute('aria-label', `${mode === 'breath' ? 'Technique' : 'Pace'}: ${pick}. Change`);
+      main.dataset.mode = menu.dataset.mode = mode;
+      orbPat = Object.fromEntries(MODE_KEYS.map((m) => [m, patternFor(m)]));
       Object.values(techBtn).forEach((b) => b.setAttribute('aria-checked', String(b.dataset.tech === P.id)));
       menu.querySelector('.bmenu-name').textContent = T ? (T.sub ? `${T.name} — ${T.sub}` : T.name) : `Your own pace — ${Spa.PACES[P.pace].label}`;
       menu.querySelector('.bmenu-counts').textContent = Spa.patternCounts(P);
@@ -698,8 +1049,8 @@
     function setBreath(id, hold) {
       Spa.setPattern(id, hold);
       const P = Spa.pattern;
-      if (P.pace) { lastPace = P.pace; lastHold = P.hold; prefs.set('pace', lastPace); prefs.set('hold', lastHold); }
-      prefs.set('choice', P.id);
+      if (mode === 'steady') { lastPace = P.pace; lastHold = P.hold; prefs.set('pace', lastPace); prefs.set('hold', lastHold); }
+      if (mode === 'breath') { lastTech = P.id; prefs.set('tech', lastTech); }
       renderBreath();
       if (st.phase === 'session') st.bChange = Math.floor(Math.max(0, st.bLocal) / st.bPat.cycle); // switch once this breath ends
     }
@@ -827,10 +1178,12 @@
       st.paused = false;
       main.classList.remove('paused', 'show-controls');
       audio.dim(false);
-      audio.stopAmbience(early ? 2 : 4);
+      // Sleep ends without the three bells or the buzz; its sound just fades away slowly.
+      const sleep = mode === 'sleep';
+      audio.stopAmbience(early ? 2 : sleep ? 20 : 4);
       const f0 = cfg.bell?.f0 ?? 196, vol = cfg.bell?.vol ?? 0.5;
       if (early) audio.bell(0.2, vol * 0.7, f0);
-      else {
+      else if (!sleep) {
         audio.bell(0.6, vol, f0); audio.bell(4.6, vol * 0.85, f0); audio.bell(8.6, vol * 0.7, f0);
         vibrate([500, 250, 500, 250, 500]);
       }
@@ -848,7 +1201,7 @@
     const room = cfg.short.toLowerCase();
     const track = (name) => window.hushTrack?.(name);
     const soundName = () => (document.querySelector(`[data-sound="${st.sound}"]`)?.textContent.trim() || st.sound).toLowerCase();
-    const breathName = () => Spa.pattern.id + (Spa.pattern.hold ? '+hold' : '');
+    const breathName = () => (mode === 'sleep' ? 'sleep' : Spa.pattern.id + (Spa.pattern.hold ? '+hold' : ''));
 
     $('#begin').addEventListener('click', begin);
     $('#again').addEventListener('click', () => { audio.ensure(); st.sound = 'silence'; renderChoices(); setPhase('setup'); });
