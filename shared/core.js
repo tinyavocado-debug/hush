@@ -458,7 +458,7 @@
       p.connect(c.notes); p.connect(c.echo);
       env.connect(p);
       env.gain.setValueAtTime(0.0001, at);
-      env.gain.exponentialRampToValueAtTime(vol, at + 0.18);
+      env.gain.exponentialRampToValueAtTime(vol, at + 0.3);
       env.gain.setTargetAtTime(vol * 0.8, at + 0.3, 0.6);
       env.gain.setTargetAtTime(0.0001, at + dur, 0.25);
       const vib = ctx.createOscillator(), vibDepth = ctx.createGain();
@@ -466,7 +466,7 @@
       vibDepth.gain.setValueAtTime(0, at);
       vibDepth.gain.linearRampToValueAtTime(f * 0.006, at + Math.min(1.2, dur));
       vib.connect(vibDepth);
-      [[1, 1], [2, 0.12], [3, 0.05]].forEach(([r, a]) => {
+      [[1, 1], [2, 0.08], [3, 0.03]].forEach(([r, a]) => {
         const o = ctx.createOscillator(), g = gain(a);
         o.frequency.value = f * r;
         const vd = gain(r); vibDepth.connect(vd).connect(o.frequency);
@@ -474,7 +474,7 @@
       });
       const air = ctx.createBufferSource();
       air.buffer = buf('white'); air.loop = true;
-      air.connect(filt('bandpass', f * 2, 3)).connect(gain(0.35)).connect(env);
+      air.connect(filt('bandpass', f * 2, 3)).connect(gain(0.2)).connect(env);
       oscs.push(vib, air);
       oscs.forEach((o) => { o.start(at); o.stop(at + dur + 1.5); });
       later(c, at, oscs);
@@ -512,7 +512,7 @@
           if (P.exhale > 0) {
             const tune = fit(FLUTE_TUNES[k], P.exhale >= 6000 ? 4 : 3), step = (P.exhale * 0.85) / tune.length;
             playList(c, p, tune.map((d, i) => [out + i * step, deg(d, D * 4), step / 1000 * (i === tune.length - 1 ? 1.3 : 0.95), 0.035, 0.2 - i * 0.1]),
-              (at, f, dur, v, pan) => flute(c, at, f, dur, v * 1.4, pan));
+              (at, f, dur, v, pan) => flute(c, at, f, dur, v, pan));
           }
         };
       },
