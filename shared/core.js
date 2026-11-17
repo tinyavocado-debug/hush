@@ -409,119 +409,147 @@
       });
     }
 
-    // Warm tones for the trial sounds: a sine with soft, quickly falling harmonics (no detuning).
-    function warmWave(n, roll) {
-      const re = new Float32Array(n + 1), im = new Float32Array(n + 1);
-      for (let i = 1; i <= n; i++) im[i] = Math.pow(i, -roll);
-      return ctx.createPeriodicWave(re, im);
-    }
-    const WARM_CHORD = [1 / 2, 3 / 4, 1, 5 / 4, 3 / 2, 9 / 4]; // D2 A2 D3 F#3 A3 E4
-    const WARM_LEVELS = [1, 0.8, 0.7, 0.55, 0.45, 0.3];
-    const WARM_PANS = [0, -0.3, 0.3, -0.45, 0.45, 0];
-    // The low chord through a filter that opens on the breath in. The three upper notes come up
-    // with the breath and sink away on the breath out.
-    function warmPad(c, level) {
-      const send = gain(0.8); send.connect(spaceSend()); c.bed.connect(send);
-      const tone = filt('lowpass', 380, 0.5), upper = gain(0.25), wave = warmWave(10, 1.8);
-      tone.connect(gain(level)).connect(c.bed);
-      upper.connect(tone);
-      WARM_CHORD.forEach((r, i) => {
-        const o = osc(c, 'sine', D * r); o.setPeriodicWave(wave);
-        o.connect(gain(WARM_LEVELS[i] * 0.09)).connect(panner(WARM_PANS[i])).connect(i < 3 ? tone : upper);
+    /* Trial (2026-11-16, round 4): the loving-kindness app's background music, ported from its
+       src/lib/sound/meditationSounds.ts. G major in just intonation: a wide pad of sine pairs a hair
+       apart going round four warm chords, a slow music-box figure of soft crystal notes on top, now
+       and then a faint high twinkle, all in the long warm reverb. Here the pad swells with the
+       breath and moves to the next chord as each breath in starts; at the Steady pace (10 s a
+       breath) that is exactly the app's own tempo. */
+    const G = 196; // G3
+    const KIND_CHORDS = [ // G maj9, E min9, C maj9 #11, D 6/9: pad voices low to high, and the four notes the figure plays
+      { pad: [1, 3 / 2, 9 / 4, 5 / 2, 3, 15 / 4], arp: [3, 4, 5, 9 / 2] },
+      { pad: [5 / 6, 3 / 2, 2, 5 / 2, 3, 15 / 4], arp: [5 / 2, 10 / 3, 4, 3] },
+      { pad: [4 / 3, 5 / 3, 2, 5 / 2, 3, 15 / 4], arp: [8 / 3, 10 / 3, 4, 5] },
+      { pad: [3 / 2, 15 / 8, 9 / 4, 5 / 2, 10 / 3, 15 / 4], arp: [3, 15 / 4, 9 / 2, 10 / 3] },
+    ];
+    // Which arp note sounds on each 16th of a breath (null is a rest): a gently lopsided figure, an
+    // answer, and space at the end for the chord to change. The app's pattern, note for note.
+    const KIND_PATTERN = [0, null, null, 1, 2, null, 3, null, 2, null, 1, null, 3, null, null, null];
+    const KIND_ARP_PANS = [-0.3, 0.3, -0.12, 0.12];
+    const KIND_LEVELS = [1, 0.75, 0.35, 0.5, 0.25, 0.18], KIND_PANS = [0, -0.35, -0.15, 0.35, -0.5, 0.5];
+    const KIND_DRIFT = [0.031, 0.043, 0.067, 0.057, 0.051, 0.023];
+    const KIND_TWINKLES = [4, 9 / 2, 5, 6, 20 / 3, 8].map((r) => G * r); // G5 A5 B5 D6 E6 G6
+    const KIND_VOL = 0.16; // the app's is 0.12, under a voice
+
+    // A soft crystal note: a pure tone with a quiet 2nd and 3rd harmonic, a gentle (40 ms) attack
+    // and a long ring; each partial a pair a hair apart for a slow, calm shimmer. Notes not yet
+    // started are remembered, so the next breath can call them off.
+    function kindNote(c, at, f, vol, ring, pan) {
+      const p = panner(pan), oscs = [];
+      p.connect(c.pulse);
+      [[1, 1], [2, 0.22], [3, 0.07]].forEach(([r, a]) => {
+        const d = ring / r;
+        [0, 0.0004].forEach((det) => {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.frequency.value = f * r * (1 + det);
+          g.gain.setValueAtTime(0.0001, at);
+          g.gain.exponentialRampToValueAtTime((vol * a) / 2, at + 0.04);
+          g.gain.exponentialRampToValueAtTime(0.0001, at + d);
+          o.connect(g).connect(p); o.start(at); o.stop(at + d + 0.1);
+          oscs.push(o);
+        });
       });
+      c.pending.push({ at, oscs });
+    }
+    // Calls off notes planned for later (a new breath plans its own); ones already ringing ring on.
+    function kindCancel(c) {
+      const t = ctx.currentTime + 0.02;
+      c.pending.forEach((n) => { if (n.at > t) n.oscs.forEach((o) => { try { o.stop(t); } catch { /* ignore */ } }); });
+      c.pending = [];
+      c.dropT.forEach(clearTimeout); c.dropT = [];
+    }
+    // Plays notes at offsets (ms into the breath) from a breath that is now `p` ms in, skipping any
+    // already past. A null frequency is a twinkle: a random high note, which also ripples the scene.
+    function kindPlay(c, p, list) {
+      const t0 = ctx.currentTime - p / 1000;
+      list.forEach(([at, f, vol, ring, pan]) => {
+        if (at < p - 50) return;
+        const t = t0 + Math.max(at, p) / 1000 + 0.02;
+        if (f) { kindNote(c, t, f, vol, ring, pan); return; }
+        const tf = KIND_TWINKLES[Math.floor(Math.random() * KIND_TWINKLES.length)];
+        const tv = 0.08 + Math.random() * 0.06, tp = Math.random() * 1.4 - 0.7;
+        kindNote(c, t, tf, tv, 5, tp);
+        c.dropT.push(setTimeout(() => { if (!c.stopped) emit('drop', { pan: tp, peak: tv * KIND_VOL * 1.5 }); }, Math.max(0, at - p)));
+      });
+    }
+    // The pad: six voices, each two sines a hair apart (a beat every 10 to 20 s, felt more than
+    // heard), each drifting slowly in level as in the app. The whole pad swells with the breath.
+    function kindPad(c) {
+      const send = gain(0.75); send.connect(spaceSend()); c.bed.connect(send);
+      const swell = gain(0.4), tone = filt('lowpass', 1100, 0.3);
+      swell.connect(tone).connect(gain(KIND_VOL)).connect(c.bed);
+      const total = KIND_LEVELS.reduce((s, x) => s + x, 0);
+      const voices = KIND_CHORDS[0].pad.map((r, i) => {
+        const g = gain(KIND_LEVELS[i] / total);
+        g.connect(panner(KIND_PANS[i])).connect(swell);
+        lfo(c, KIND_DRIFT[i], (KIND_LEVELS[i] / total) * 0.35, g.gain);
+        return [0, 0.0003].map((det) => { const o = osc(c, 'sine', G * r * (1 + det)); o.connect(g); return [o, det]; });
+      });
+      c.pulse = gain(KIND_VOL); c.pulse.connect(c.bed);
+      c.pending = []; c.dropT = [];
       return {
-        breathe(p) {
-          breathShape(tone.frequency, p, 2000, 380, true);
-          breathShape(upper.gain, p, 1, 0.25);
+        // Fullest at the top of the breath in, softest as the breath out ends.
+        breathe(p) { breathShape(swell.gain, p, 1, 0.4); breathShape(tone.frequency, p, 2100, 1100, true); },
+        // Glides into chord `i` (the app glides with a 0.35 s time constant).
+        chord(i) {
+          const t = ctx.currentTime;
+          KIND_CHORDS[i].pad.forEach((r, j) => voices[j].forEach(([o, det]) => {
+            o.frequency.cancelScheduledValues(t); o.frequency.setTargetAtTime(G * r * (1 + det), t, 0.35);
+          }));
         },
       };
     }
-    // Faint high starlight (A5 D6 F#6) that fades in while a breath is held and out as it moves.
-    function holdStars(c, p) {
-      if (!c.stars) {
-        c.stars = gain(0); c.stars.connect(c.bed);
-        [[6, 0.012, -0.5], [8, 0.009, 0.5], [10, 0.006, 0]].forEach(([r, a, pan]) =>
-          osc(c, 'sine', D * r).connect(gain(a)).connect(panner(pan)).connect(c.stars));
-      }
-      const P = breathPattern, ramp = (ms, f) => Math.min(1, (f * ms) / 900, ((1 - f) * ms) / 900);
-      breathCurve(c.stars.gain, p, (b) =>
-        b.stage === 'hold-in' ? ramp(P.holdIn, b.f) : b.stage === 'hold-out' ? 0.6 * ramp(P.holdOut, b.f) : 0);
-    }
-
-    // A warm chime: a soft (15 ms) strike, a long-ringing fundamental, a gentle octave and a
-    // touch of the 3rd harmonic, all rolled off so it rings round rather than bright.
-    function warmChime(c, at, f, vol, pan) {
-      if (!c.chimeOut) { c.chimeOut = filt('lowpass', 2200, 0.4); c.chimeOut.connect(c.bed); }
-      const p = panner(pan); p.connect(c.chimeOut);
-      [[1, 1, 6], [2, 0.3, 2.5], [3, 0.07, 1.2]].forEach(([r, a, d]) => {
-        const o = ctx.createOscillator(), g = ctx.createGain();
-        o.frequency.value = f * r;
-        g.gain.setValueAtTime(0.0001, at);
-        g.gain.exponentialRampToValueAtTime(vol * a, at + 0.015);
-        g.gain.exponentialRampToValueAtTime(0.0001, at + d);
-        o.connect(g).connect(p); o.start(at); o.stop(at + d + 0.1);
-      });
-    }
-    // Rings chimes at offsets (ms into the breath) from a breath that is now `p` ms in; skips any
-    // already past and ripples the scene with each.
-    function warmChimes(c, p, list) {
-      const t0 = ctx.currentTime - p / 1000;
-      list.forEach(([at, f, vol, pan]) => {
-        if (at < p - 50) return;
-        warmChime(c, t0 + Math.max(at, p) / 1000 + 0.02, f, vol, pan);
-        setTimeout(() => { if (!c.stopped) emit('drop', { pan, peak: vol * 0.7 }); }, Math.max(0, at - p));
-      });
+    // Shared start of each breath for the three: shape the pad, call off old notes, and on a new
+    // breath move to its chord. Returns the chord, or null while settling into the session.
+    function kindBreath(c, pad, p, cycle) {
+      pad.breathe(p);
+      kindCancel(c);
+      if (!breathPattern.inhale) return null; // the lone settling breath out: let what rings, ring
+      const i = ((cycle % 4) + 4) % 4;
+      if (p < 300) pad.chord(i);
+      return KIND_CHORDS[i];
     }
 
     const BEDS = {
-      // Trial (2026-11-16, round 2): warm and comforting, still cosmic, and plainly following
-      // breath in, hold and breath out.
-      glow(c) {
-        // A low, soft D major chord that opens up and swells as you breathe in, rests full while
-        // you hold, and closes back down as you breathe out. Faint starlight shines in each hold.
-        const pad = warmPad(c, 1);
-        c.breathe = (p) => { pad.breathe(p); holdStars(c, p); };
-      },
-      // Round 3: Glow plus a few warm chimes, three ways.
-      cues(c) {
-        // A warm chime as each breath in starts (A4), a lower one as each breath out starts (D4).
-        const pad = warmPad(c, 1);
-        c.breathe = (p) => {
-          const P = breathPattern, list = [];
-          pad.breathe(p); holdStars(c, p);
-          if (P.inhale > 0) list.push([0, D * 3, 0.06, -0.3]);
-          if (P.exhale > 0) list.push([P.inhale + P.holdIn, D * 2, 0.07, 0.3]);
-          warmChimes(c, p, list);
+      // Round 4: the loving-kindness app's music, three ways.
+      kindness(c) {
+        // As in the app: the music-box figure spread over the whole breath, a faint twinkle now
+        // and then in its rests, the chords going round one per breath.
+        const pad = kindPad(c);
+        c.breathe = (p, cycle) => {
+          const chord = kindBreath(c, pad, p, cycle);
+          if (!chord) return;
+          const step = breathPattern.cycle / 16, list = [];
+          KIND_PATTERN.forEach((n, s) => {
+            if (n !== null) list.push([s * step, G * chord.arp[n], 0.14 * (s % 8 ? 0.8 : 1) * (0.85 + Math.random() * 0.15), 3.5, KIND_ARP_PANS[n]]);
+            else if (Math.random() < 0.1) list.push([s * step, null]);
+          });
+          kindPlay(c, p, list);
         };
       },
-      drift(c) {
-        // Two chimes drift in at loose moments through each breath in, now and then one more
-        // while holding, and sometimes a low one on the way out. A different pair each breath.
-        const pad = warmPad(c, 1), notes = [2, 5 / 2, 3, 4];
-        const pick = () => D * notes[Math.floor(Math.random() * notes.length)];
-        c.breathe = (p) => {
-          const P = breathPattern, list = [], pan = () => Math.random() * 1.2 - 0.6;
-          pad.breathe(p); holdStars(c, p);
-          if (P.inhale > 0) {
-            list.push([P.inhale * (0.05 + Math.random() * 0.25), pick(), 0.05, pan()]);
-            list.push([P.inhale * (0.45 + Math.random() * 0.3), pick(), 0.04, pan()]);
-          }
-          if (P.holdIn > 1500 && Math.random() < 0.4) list.push([P.inhale + P.holdIn * 0.4, D * 4, 0.03, pan()]);
-          if (P.exhale > 0 && Math.random() < 0.5) list.push([P.inhale + P.holdIn + P.exhale * (0.2 + Math.random() * 0.3), D * 2, 0.06, pan()]);
-          warmChimes(c, p, list);
+      rise(c) {
+        // The same notes, following the breath: they climb the chord through each breath in, a
+        // twinkle while holding, and step back down, softer and longer, through each breath out.
+        const pad = kindPad(c);
+        c.breathe = (p, cycle) => {
+          const chord = kindBreath(c, pad, p, cycle);
+          if (!chord) return;
+          const P = breathPattern, up = [...chord.arp].sort((a, b) => a - b), list = [];
+          if (P.inhale > 0) up.forEach((r, j) => list.push([(j * P.inhale) / 4, G * r, 0.14 * (j ? 0.85 : 1), 3.5, KIND_ARP_PANS[j]]));
+          if (P.holdIn > 0) list.push([P.inhale + P.holdIn * 0.4, null]);
+          const out = P.inhale + P.holdIn;
+          if (P.exhale > 0) [...up].reverse().forEach((r, j) => list.push([out + (j * P.exhale) / 4, G * r, 0.11, 5, KIND_ARP_PANS[3 - j]]));
+          kindPlay(c, p, list);
         };
       },
-      crest(c) {
-        // A soft rolled chord of chimes (F#4 A4 D5) at the top of each breath in, and one low
-        // chime (D4) as the breath out comes to rest.
-        const pad = warmPad(c, 1);
-        c.breathe = (p) => {
-          const P = breathPattern, list = [];
-          pad.breathe(p); holdStars(c, p);
-          if (P.inhale > 0) [[5 / 2, -0.4], [3, 0], [4, 0.4]].forEach(([r, pan], i) =>
-            list.push([Math.max(0, P.inhale - 500) + i * 240, D * r, 0.045 - i * 0.006, pan]));
-          if (P.exhale > 0) list.push([P.inhale + P.holdIn + P.exhale - 300, D * 2, 0.06, 0]);
-          warmChimes(c, p, list);
+      night(c) {
+        // Just the pad and the twinkles: two or three faint high notes at loose moments each breath.
+        const pad = kindPad(c);
+        c.breathe = (p, cycle) => {
+          if (!kindBreath(c, pad, p, cycle)) return;
+          const n = 2 + (Math.random() < 0.4 ? 1 : 0), list = [];
+          for (let i = 0; i < n; i++) list.push([breathPattern.cycle * ((i + Math.random()) / n), null]);
+          kindPlay(c, p, list.sort((a, b) => a[0] - b[0]));
         };
       },
       float(c) {
