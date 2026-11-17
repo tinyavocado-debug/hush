@@ -493,13 +493,13 @@
         c.notes = gain(1); c.notes.connect(c.bed);
         c.echo = echo(c, 0.3);
         const pad = stringPad(c, 0.08), star = starlight(c, 0.02);
-        const wind = gain(0.008), band = filt('bandpass', 500, 1.1);
+        const wind = gain(0.009), band = filt('bandpass', 500, 1.1);
         src(c, buf('white')).connect(band).connect(wind).connect(c.bed);
         osc(c, 'sine', D / 2).connect(gain(0.035)).connect(c.bed); // D2
         c.breathe = (p, cycle) => {
           const P = breathPattern;
           pad.breathe(p); star.breathe(p);
-          breathShape(wind.gain, p, 0.03, 0.006);
+          breathShape(wind.gain, p, 0.042, 0.009);
           breathShape(band.frequency, p, 1300, 380, true);
           callOff(c);
           if (!P.inhale) return;
