@@ -344,7 +344,7 @@
   const app = Spa.createApp({
     key: 'still', title: 'Orbit · Hush', short: 'Orbit', // key kept from Still, so saved lengths carry over
     min: 5, max: MAX, defaultMinutes: 30,
-    sounds: ['float', 'voyage', 'silence', 'musicbox', 'storybook', 'glade'],
+    sounds: ['float', 'voyage', 'silence'],
     bell: { f0: 196, vol: 0.5 },
     render,
     onPhase: (p) => scene.setFocus(p === 'session' ? 1 : 0),
