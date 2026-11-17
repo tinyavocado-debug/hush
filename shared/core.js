@@ -483,39 +483,64 @@
       [4, 2, 1, 0], [5, 4, 2, 4], [7, 5, 4, 2], [4, 5, 2, 1],
     ];
 
+    // Float: an enchanted glade among the stars. A soft solar wind rises with each breath in,
+    // three faint grains of fairy dust as each breath in starts, and a wooden flute sings a little
+    // answer through each breath out, trailing off in a long echo, over the faint string pad,
+    // starlight and a deep, quiet hum. Kept soft and far off.
+    // Trial styles, each more cosmic: 'stardust' (brighter starlight, a sparkle run up each breath
+    // in and stray twinkles through each breath out), 'nebula' (the flute far off in a cloud: mostly
+    // reverb and echo, a faint octave shimmer above it, the wind whistling), 'deep' (a vast low
+    // rumble swelling with the breath under a fifth, brighter starlight, darker wind).
+    function floatBed(c, style) {
+      const neb = style === 'nebula', deep = style === 'deep', dust = style === 'stardust';
+      const send = gain(neb ? 1.1 : 0.95); send.connect(spaceSend()); c.bed.connect(send);
+      c.notes = gain(neb ? 0.55 : 1); c.notes.connect(c.bed);
+      c.echo = echo(c, neb ? 0.45 : deep ? 0.35 : 0.3);
+      const pad = stringPad(c, 0.08), star = starlight(c, dust ? 0.035 : deep ? 0.03 : 0.02);
+      const wind = gain(0.009), band = filt('bandpass', 500, neb ? 3 : 1.1);
+      src(c, buf('white')).connect(band).connect(wind).connect(c.bed);
+      osc(c, 'sine', D / 2).connect(gain(0.035)).connect(c.bed); // D2
+      let rumble = null, rumbleTone = null;
+      if (deep) {
+        osc(c, 'sine', (D * 3) / 4).connect(gain(0.022)).connect(c.bed); // A2
+        rumbleTone = filt('lowpass', 140, 0.5); rumble = gain(0.05);
+        src(c, buf('brown'), 0.6).connect(rumbleTone).connect(rumble).connect(c.bed);
+      }
+      const windTop = neb ? 0.045 : deep ? 0.035 : 0.042;
+      c.breathe = (p, cycle) => {
+        const P = breathPattern;
+        pad.breathe(p); star.breathe(p);
+        breathShape(wind.gain, p, windTop, windTop * 0.2);
+        breathShape(band.frequency, p, deep ? 850 : 1300, deep ? 280 : 380, true);
+        if (deep) { breathShape(rumble.gain, p, 0.16, 0.05); breathShape(rumbleTone.frequency, p, 320, 120, true); }
+        callOff(c);
+        if (!P.inhale) return;
+        const ch = taleChord(cycle), k = ((cycle % 4) + 4) % 4;
+        if (p < 300) { pad.chord(ch); star.chord(ch); }
+        const sparks = [], out = P.inhale + P.holdIn;
+        if (dust) {
+          [0, 2, 4, 7, 9, 11].forEach((d, i) => sparks.push([120 + i * (150 + Math.random() * 60), deg(d, D * 8), 0.012 - i * 0.0012, -0.6 + i * 0.24]));
+          if (P.exhale > 0) [0, 1].forEach(() => sparks.push([out + P.exhale * (0.1 + Math.random() * 0.8), deg([7, 9, 11, 14][Math.floor(Math.random() * 4)], D * 8), 0.006, Math.random() * 1.4 - 0.7]));
+          sparks.sort((a, b) => a[0] - b[0]);
+        } else [2, 4, 7].forEach((d, i) => sparks.push([150 + i * (260 + Math.random() * 120), deg(d, D * 8), 0.009 - i * 0.0015, -0.4 + i * 0.4]));
+        playList(c, p, sparks, (at, f, v, pan) => celesta(c, at, f, v, dust ? 3 : 2.2, pan), 0.015);
+        if (P.exhale > 0) {
+          const tune = fit(FLUTE_TUNES[k], P.exhale >= 6000 ? 4 : 3), step = (P.exhale * 0.85) / tune.length;
+          playList(c, p, tune.map((d, i) => [out + i * step, deg(d, D * 4), step / 1000 * (i === tune.length - 1 ? 1.3 : 0.95), 0.035, 0.2 - i * 0.1]),
+            (at, f, dur, v, pan) => {
+              flute(c, at, f, dur, v, pan);
+              if (neb) flute(c, at + 0.15, f * 2, dur, v * 0.2, -pan); // the shimmer an octave up
+            });
+        }
+      };
+    }
+
     const BEDS = {
-      float(c) {
-        // An enchanted glade among the stars: a soft solar wind rises with each breath in, three
-        // faint grains of fairy dust as each breath in starts, and a wooden flute sings a little
-        // answer through each breath out, trailing off in a long echo, over the faint string pad,
-        // starlight and a deep, quiet hum. Kept soft and far off.
-        const send = gain(0.95); send.connect(spaceSend()); c.bed.connect(send);
-        c.notes = gain(1); c.notes.connect(c.bed);
-        c.echo = echo(c, 0.3);
-        const pad = stringPad(c, 0.08), star = starlight(c, 0.02);
-        const wind = gain(0.009), band = filt('bandpass', 500, 1.1);
-        src(c, buf('white')).connect(band).connect(wind).connect(c.bed);
-        osc(c, 'sine', D / 2).connect(gain(0.035)).connect(c.bed); // D2
-        c.breathe = (p, cycle) => {
-          const P = breathPattern;
-          pad.breathe(p); star.breathe(p);
-          breathShape(wind.gain, p, 0.042, 0.009);
-          breathShape(band.frequency, p, 1300, 380, true);
-          callOff(c);
-          if (!P.inhale) return;
-          const ch = taleChord(cycle), k = ((cycle % 4) + 4) % 4;
-          if (p < 300) { pad.chord(ch); star.chord(ch); }
-          const dust = [];
-          [2, 4, 7].forEach((d, i) => dust.push([150 + i * (260 + Math.random() * 120), deg(d, D * 8), 0.009 - i * 0.0015, -0.4 + i * 0.4]));
-          playList(c, p, dust, (at, f, v, pan) => celesta(c, at, f, v, 2.2, pan), 0.015);
-          const out = P.inhale + P.holdIn;
-          if (P.exhale > 0) {
-            const tune = fit(FLUTE_TUNES[k], P.exhale >= 6000 ? 4 : 3), step = (P.exhale * 0.85) / tune.length;
-            playList(c, p, tune.map((d, i) => [out + i * step, deg(d, D * 4), step / 1000 * (i === tune.length - 1 ? 1.3 : 0.95), 0.035, 0.2 - i * 0.1]),
-              (at, f, dur, v, pan) => flute(c, at, f, dur, v, pan));
-          }
-        };
-      },
+      float(c) { floatBed(c, ''); },
+      // Trial (2026-11-16): Float, more cosmic, three ways.
+      stardust(c) { floatBed(c, 'stardust'); },
+      nebula(c) { floatBed(c, 'nebula'); },
+      deepspace(c) { floatBed(c, 'deep'); },
       voyage(c) {
         // Once upon a time: a harp rolls slowly up through the chord through each breath in, two or
         // three strings drift back down through each breath out, over a warm string pad that swells
