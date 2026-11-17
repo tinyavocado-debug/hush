@@ -501,7 +501,7 @@
     }
     // Theremin: a soft, round voice (a sine with a touch of 3rd harmonic) that slides into each
     // note from the one before, with a wide, slow vibrato.
-    function thereminNote(c, at, f, dur, vol, pan, from) {
+    function thereminNote(c, at, f, dur, vol, pan, from, glide = 0.12) {
       const p = panner(pan), env = ctx.createGain(), oscs = [];
       p.connect(c.notes); p.connect(c.echo); env.connect(p);
       env.gain.setValueAtTime(0.0001, at);
@@ -514,7 +514,7 @@
       [[1, 1], [3, 0.06]].forEach(([r, a]) => {
         const o = ctx.createOscillator();
         o.frequency.setValueAtTime((from || f * 0.94) * r, at);
-        o.frequency.setTargetAtTime(f * r, at, 0.12);
+        o.frequency.setTargetAtTime(f * r, at, glide);
         vd.connect(gain(r)).connect(o.frequency);
         o.connect(gain(a)).connect(env); oscs.push(o);
       });
@@ -544,11 +544,36 @@
       later(c, at, oscs);
     }
 
+    // Trial tunes for Float, sung in place of the flute's garden-like steps: few, long notes, wide
+    // leaps, and tones left floating rather than coming home. Ratios of D5, one list per chord
+    // (D, B minor, G, A); `place` gives each note's start and length (ms) in the breath out.
+    const SPACE_TUNES = {
+      // Wonder, on glass: three slow notes leaning on each chord's floating colours, the raised
+      // 4th (G#, the old Orbit "wonder" note), the 9th and the major 7th.
+      wonder: {
+        notes: [[9 / 4, 45 / 32, 3 / 2], [5 / 2, 15 / 8, 5 / 3], [3, 15 / 8, 5 / 4], [5 / 3, 45 / 32, 9 / 4]],
+        place: (i, n, E) => [(i * E * 0.8) / n, ((E * 0.8) / n) * 1.5],
+        sing: (c, at, f, dur, v, pan) => glassNote(c, at, f, dur, v * 1.1, pan),
+      },
+      // Swoop, on theremin: a slow slide up an octave or more, then a fall, the glides heard.
+      swoop: {
+        notes: [[3 / 4, 3 / 2, 1], [5 / 6, 5 / 2, 5 / 3], [2 / 3, 5 / 3, 5 / 4], [3 / 4, 15 / 8, 9 / 8]],
+        place: (i, n, E) => [(i * E * 0.85) / n, (E * 0.85) / n],
+        sing: (c, at, f, dur, v, pan, from) => thereminNote(c, at, f, dur, v, pan, from, 0.3),
+      },
+      // Beacon, on choir: two long notes a 4th or 5th apart, overlapping, like a far-off call.
+      beacon: {
+        notes: [[3 / 2, 1], [5 / 4, 5 / 6], [2, 4 / 3], [15 / 8, 9 / 8]],
+        place: (i, n, E) => [i * E * 0.4, E * 0.6],
+        sing: (c, at, f, dur, v, pan) => choirNote(c, at, f, dur, v * 1.7, pan),
+      },
+    };
+
     // Float: an enchanted glade among the stars. A soft solar wind rises with each breath in,
     // three faint grains of fairy dust as each breath in starts, and a little tune sung through
     // each breath out, trailing off in a long echo, over the faint string pad, starlight and a
-    // deep, quiet hum. Kept soft and far off. `voice` sings the tune: '' the wooden flute, or a
-    // trial voice ('glass', 'theremin', 'choir').
+    // deep, quiet hum. Kept soft and far off. `voice` sings the tune: '' the wooden flute, or one
+    // of the trial SPACE_TUNES.
     function floatBed(c, voice) {
       const send = gain(0.95); send.connect(spaceSend()); c.bed.connect(send);
       c.notes = gain(1); c.notes.connect(c.bed);
@@ -557,12 +582,7 @@
       const wind = gain(0.009), band = filt('bandpass', 500, 1.1);
       src(c, buf('white')).connect(band).connect(wind).connect(c.bed);
       osc(c, 'sine', D / 2).connect(gain(0.035)).connect(c.bed); // D2
-      const sing = {
-        '': (at, f, dur, v, pan) => flute(c, at, f, dur, v, pan),
-        glass: (at, f, dur, v, pan) => glassNote(c, at, f, dur, v * 1.1, pan),
-        theremin: (at, f, dur, v, pan, from) => thereminNote(c, at, f, dur, v, pan, from),
-        choir: (at, f, dur, v, pan) => choirNote(c, at, f, dur, v * 3.2, pan),
-      }[voice];
+      const space = SPACE_TUNES[voice];
       c.breathe = (p, cycle) => {
         const P = breathPattern;
         pad.breathe(p); star.breathe(p);
@@ -576,19 +596,27 @@
         [2, 4, 7].forEach((d, i) => dust.push([150 + i * (260 + Math.random() * 120), deg(d, D * 8), 0.009 - i * 0.0015, -0.4 + i * 0.4]));
         playList(c, p, dust, (at, f, v, pan) => celesta(c, at, f, v, 2.2, pan), 0.015);
         const out = P.inhale + P.holdIn;
-        if (P.exhale > 0) {
+        if (P.exhale > 0 && space) {
+          // A trial tune: its notes for this chord, laid out over the breath out.
+          const notes = space.notes[k].map((r) => D * 4 * r), E = P.exhale;
+          playList(c, p, notes.map((f, i) => {
+            const [at, dur] = space.place(i, notes.length, E);
+            return [out + at, f, dur / 1000, 0.035, 0.3 - (0.6 * i) / Math.max(1, notes.length - 1), i ? notes[i - 1] : 0];
+          }), (at, f, dur, v, pan, from) => space.sing(c, at, f, dur, v, pan, from));
+        } else if (P.exhale > 0) {
           const tune = fit(FLUTE_TUNES[k], P.exhale >= 6000 ? 4 : 3), step = (P.exhale * 0.85) / tune.length;
-          playList(c, p, tune.map((d, i) => [out + i * step, deg(d, D * 4), step / 1000 * (i === tune.length - 1 ? 1.3 : 0.95), 0.035, 0.2 - i * 0.1, i ? deg(tune[i - 1], D * 4) : 0]), sing);
+          playList(c, p, tune.map((d, i) => [out + i * step, deg(d, D * 4), step / 1000 * (i === tune.length - 1 ? 1.3 : 0.95), 0.035, 0.2 - i * 0.1]),
+            (at, f, dur, v, pan) => flute(c, at, f, dur, v, pan));
         }
       };
     }
 
     const BEDS = {
       float(c) { floatBed(c, ''); },
-      // Trial (2026-11-16): Float with a spacier voice in place of the flute, three ways.
-      glass(c) { floatBed(c, 'glass'); },
-      theremin(c) { floatBed(c, 'theremin'); },
-      choir(c) { floatBed(c, 'choir'); },
+      // Trial (2026-11-16): Float with a spacier tune and voice in place of the flute, three ways.
+      wonder(c) { floatBed(c, 'wonder'); },
+      swoop(c) { floatBed(c, 'swoop'); },
+      beacon(c) { floatBed(c, 'beacon'); },
       voyage(c) {
         // Once upon a time: a harp rolls slowly up through the chord through each breath in, two or
         // three strings drift back down through each breath out, over a warm string pad that swells
