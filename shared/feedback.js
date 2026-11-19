@@ -1,6 +1,8 @@
 /* A note in every room. The mark in the top corner opens a way to leave a note that
    belongs to the room it's in:
-     Star    (Orbit, and the picker)  write a wish, hold, and it flies up into the sky as a star.
+     Turn over (the picker)           the whole screen of rooms turns over like a card; the note is
+                                      on its back, with optional tags and an optional room.
+     Star    (Orbit)                  write a wish, hold, and it flies up into the sky as a star.
                                       Your own stars stay in Orbit's sky as a small constellation.
      Stones  (Pond)                   toss a stone (Love it / Something's off / An idea) into the
                                       water; a lily pad comes up for a few words if you like.
@@ -11,7 +13,7 @@
    In a session the mark only shows with the controls, in the top left. */
 (() => {
   const where = (location.pathname.match(/\/(orbit|ember|pond)\//) || [, 'picker'])[1];
-  const style = { orbit: 'star', picker: 'star', pond: 'stones', ember: 'smoke' }[where];
+  const style = { orbit: 'star', picker: 'over', pond: 'stones', ember: 'smoke' }[where];
   const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const DPR = Math.min(2, window.devicePixelRatio || 1);
   const MAX = 300;
@@ -114,6 +116,41 @@
   .fb-pill.solid { background: #e8efe4; color: #10302b !important; border-color: #e8efe4; }
   .fb-pill:disabled { opacity: .5; }
 
+  /* Turn over (picker): the screen of rooms turns over like one card, the note is on its back */
+  .fb-screen { max-width: 1080px; margin: 0 auto; perspective: 2400px; }
+  .fb-screen-flip { position: relative; transform-style: preserve-3d; transition: transform 1.1s cubic-bezier(.3,.7,.2,1); }
+  .fb-screen.over .fb-screen-flip { transform: rotateY(180deg); }
+  .fb-screen nav { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+  body.fb-over .fb-entry { opacity: 0; pointer-events: none; }
+  .fb-verso { position: absolute; inset: 0; transform: rotateY(180deg); backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    border-radius: 26px; overflow: hidden; isolation: isolate; display: flex; flex-direction: column; align-items: center; padding: 34px 22px;
+    background: #0d0f17; color: var(--ink, #efe6d8); font-family: var(--sans, 'Jost', system-ui, sans-serif); font-weight: 300;
+    box-shadow: 0 0 0 1px rgba(239,230,216,.14), 0 30px 120px -24px rgba(120, 110, 200, .35); }
+  @media (min-width: 760px) { .fb-verso { justify-content: center; } }
+  .fb-verso::before { content: ''; position: absolute; inset: 0; z-index: -1; animation: fb-verso 10s ease-in-out infinite alternate;
+    background: radial-gradient(40% 50% at 17% 100%, rgba(104, 80, 240, .28), transparent 70%),
+      radial-gradient(40% 50% at 50% 100%, rgba(240, 150, 70, .22), transparent 70%),
+      radial-gradient(40% 50% at 83% 100%, rgba(50, 180, 145, .24), transparent 70%); }
+  @keyframes fb-verso { to { opacity: .6; } }
+  .fb-verso form { width: 100%; max-width: 480px; display: grid; gap: 16px; justify-items: center; text-align: center; }
+  .fb-verso .fb-label { color: inherit; }
+  .fb-verso h2 { margin: 0; font: italic 300 clamp(30px, 7vw, 42px)/1.1 ${SERIF}; text-wrap: balance; }
+  .fb-verso .fb-write { height: 96px; border-bottom: 1px solid rgba(239,230,216,.22); font-size: 24px; caret-color: #ffe6b0; }
+  .fb-verso .fb-write:focus { border-bottom-color: rgba(239,230,216,.55); }
+  .fb-verso button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
+  .fb-verso button:focus-visible, .fb-verso textarea:focus-visible { outline: 2px solid var(--ink, #efe6d8); outline-offset: 3px; }
+  .fb-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+  .fb-chips button { border: 1px solid rgba(239,230,216,.18); background: rgba(239,230,216,.08); border-radius: 999px; padding: 6px 12px; font-size: 12.5px !important; cursor: pointer; opacity: .8; }
+  .fb-chips button[aria-pressed="true"] { background: #efe6d8; color: #12131a !important; border-color: #efe6d8; opacity: 1; }
+  .fb-about { display: grid; gap: 8px; justify-items: center; }
+  .fb-about > span { font-size: 10.5px; letter-spacing: .24em; text-transform: uppercase; opacity: .5; }
+  .fb-verso .fb-row { display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 4px; }
+  .fb-send { border: 0; border-radius: 999px; padding: 10px 22px; background: #efe6d8; color: #12131a !important; font-size: 13.5px !important; letter-spacing: .04em; cursor: pointer; }
+  .fb-send:disabled { opacity: .4; cursor: default; }
+  .fb-verso-thanks { display: none; margin: auto 0; font: italic 300 30px/1.25 ${SERIF}; text-align: center; max-width: 16ch; }
+  .fb-verso.sent form { display: none; }
+  .fb-verso.sent .fb-verso-thanks { display: block; animation: fb-in 1s ease both; }
+
   /* Smoke */
   .fb-smoke { background: linear-gradient(180deg, rgba(12, 7, 5, .7), rgba(12, 7, 5, .35) 55%, rgba(12, 7, 5, 0)); }
   .fb-smoke .fb-col { top: calc(env(safe-area-inset-top, 0px) + 12vh); }
@@ -133,19 +170,20 @@
     stones: '<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="18.2" rx="7.2" ry="3"/><ellipse cx="12" cy="12.4" rx="5" ry="2.4"/><ellipse cx="12" cy="7.4" rx="3" ry="1.9"/></svg>',
     smoke: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.5v-6"/><path d="M12 13c-2.5-1.6-2.5-3.6 0-5.2s2.5-3.6 0-5.3"/><path d="M15.5 11.5c-1.4-1-1.4-2.2 0-3.2" opacity=".55"/></svg>',
   };
-  const LABEL = { star: 'Send a wish to the stars', stones: 'Toss a stone with a note', smoke: 'Write a note to the smoke' };
-  const THANKS = { star: 'Your star is in the sky. Thank you.', stones: 'The pond has it. Thank you.', smoke: 'Carried off on the smoke. Thank you.' };
+  ICON.over = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v12H10l-5 4z"/><path d="M9 9h6M9 12h4"/></svg>';
+  const LABEL = { over: 'Leave a note', star: 'Send a wish to the stars', stones: 'Toss a stone with a note', smoke: 'Write a note to the smoke' };
+  const THANKS = { over: 'Thank you. It\'s on its way.', star: 'Your star is in the sky. Thank you.', stones: 'The pond has it. Thank you.', smoke: 'Carried off on the smoke. Thank you.' };
   const PREVIEW = 'Preview: notes aren\'t sent from localhost.';
   const FAILED = 'Couldn\'t send. An ad or tracker blocker, or being offline, can stop it. Your note is still here.';
 
   /* ───── sending ───── */
   // Resolves 'sent' or 'preview' (localhost); rejects if it couldn't get through.
-  async function send(note) {
+  async function send(note, at = where) {
     note = note.slice(0, MAX);
     if (!window.hushSend) throw new Error('analytics.js missing');
     try {
       await Promise.race([
-        window.hushSend(`feedback/${where}/${note.replace(/\s+/g, ' ')}`, note),
+        window.hushSend(`feedback/${at}/${note.replace(/\s+/g, ' ')}`, note),
         new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 8000)),
       ]);
       return 'sent';
@@ -186,6 +224,7 @@
   /* ───── open and close ───── */
   let layer, entry, impl, lastFocus;
   function open() {
+    if (impl.self) return impl.open();
     if (!layer.hidden) return;
     lastFocus = document.activeElement;
     document.body.classList.add('fb-open');
@@ -445,6 +484,78 @@
   }
 
   /* ═════════ Smoke ═════════ */
+  /* ═════════ Turn over (picker) ═════════ */
+  function overImpl() {
+    const nav = document.querySelector('nav.designs');
+    if (!nav) { console.warn('[hush] Turn over needs nav.designs; using Star'); return starImpl(); }
+    const screen = document.createElement('div'); screen.className = 'fb-screen';
+    screen.innerHTML = '<div class="fb-screen-flip"></div>';
+    nav.before(screen);
+    const flip = screen.firstChild; flip.append(nav);
+    const KIND = { love: 'Love it', off: 'Something\'s off', idea: 'Idea' }; // same words as Pond's stones
+    const chip = (t, say = t) => `<button type="button" aria-pressed="false" data-say="${say}">${t}</button>`;
+    flip.insertAdjacentHTML('beforeend', `<section class="fb-verso" aria-label="Leave a note" aria-hidden="true" inert>
+      <form>
+        <p class="fb-label">The other side of Hush</p>
+        <h2>Leave us a note.</h2>
+        <textarea class="fb-write" maxlength="${MAX}" placeholder="A wish, a problem, a thank-you…" aria-label="Your note"></textarea>
+        <div class="fb-chips fb-tags" role="group" aria-label="What kind of note (optional)">${Object.values(KIND).map((k) => chip(k === 'Idea' ? 'An idea' : k, k)).join('')}</div>
+        <div class="fb-about"><span>About a room? (optional)</span>
+          <div class="fb-chips fb-rooms" role="group" aria-label="Which room (optional)">${['Orbit', 'Ember', 'Pond'].map(chip).join('')}</div></div>
+        <p class="fb-status" role="status"></p>
+        <div class="fb-row"><button type="button" class="fb-quiet">Turn back</button><button class="fb-send">Send</button></div>
+      </form>
+      <p class="fb-verso-thanks" role="status"></p>
+    </section>`);
+    const verso = flip.querySelector('.fb-verso'), form = verso.querySelector('form'), q = (s) => verso.querySelector(s);
+    const text = q('.fb-write'), tags = q('.fb-tags'), rooms = q('.fb-rooms'), status = q('.fb-status'), sendBtn = q('.fb-send'), thanks = q('.fb-verso-thanks');
+    const picked = (row) => row.querySelector('[aria-pressed="true"]')?.dataset.say || '';
+    const unpick = (row) => row.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', 'false'));
+    for (const row of [tags, rooms]) row.addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      const on = b.getAttribute('aria-pressed') !== 'true';
+      unpick(row); b.setAttribute('aria-pressed', String(on)); status.textContent = '';
+    });
+    let lastFocus = null, isOver = false, busy = false, resetT;
+    function turnOver() {
+      if (isOver) return;
+      isOver = true; lastFocus = document.activeElement; clearTimeout(resetT); reset();
+      screen.classList.add('over'); document.body.classList.add('fb-over');
+      nav.inert = true; verso.inert = false; verso.setAttribute('aria-hidden', 'false');
+      screen.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
+      setTimeout(() => text.focus({ preventScroll: true }), REDUCED ? 0 : 700);
+    }
+    function reset() { verso.classList.remove('sent'); text.value = ''; unpick(tags); unpick(rooms); status.textContent = ''; busy = false; sendBtn.disabled = false; }
+    function turnBack() {
+      if (!isOver) return;
+      isOver = false;
+      screen.classList.remove('over'); document.body.classList.remove('fb-over');
+      nav.inert = false; verso.inert = true; verso.setAttribute('aria-hidden', 'true');
+      if (verso.classList.contains('sent')) resetT = setTimeout(reset, 1100); // an unsent note stays for next time
+      const back = lastFocus && document.contains(lastFocus) && lastFocus !== document.body ? lastFocus : entry;
+      back.focus?.({ preventScroll: true });
+    }
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (busy) return;
+      const words = clean(text.value), tag = picked(tags);
+      if (!words && !tag) { text.classList.remove('nudge'); void text.offsetWidth; text.classList.add('nudge'); text.focus(); return; }
+      busy = true; sendBtn.disabled = true; status.textContent = '';
+      const note = tag ? (words ? `${tag}: ${words}` : tag) : words;
+      let result;
+      try { result = await send(note, (picked(rooms) || 'picker').toLowerCase()); } catch {
+        busy = false; sendBtn.disabled = false; status.textContent = FAILED; return;
+      }
+      thanks.textContent = result === 'preview' ? PREVIEW : THANKS.over;
+      verso.classList.add('sent');
+      setTimeout(turnBack, result === 'preview' ? 3200 : 2600);
+    });
+    text.addEventListener('input', () => { status.textContent = ''; });
+    q('.fb-quiet').addEventListener('click', turnBack);
+    verso.addEventListener('keydown', (e) => { if (e.key === 'Escape') turnBack(); });
+    return { self: true, open: turnOver };
+  }
+
   function smokeImpl() {
     layer.classList.add('fb-smoke');
     layer.innerHTML = `<div class="fb-col" role="dialog" aria-modal="true" aria-label="Say it to the smoke">
@@ -524,7 +635,7 @@
     entry = document.querySelector('.fb-entry'); layer = document.querySelector('.fb-layer');
     fx = document.querySelector('.fb-fx'); fctx = fx.getContext('2d');
     setupSky(); fit(); addEventListener('resize', fit);
-    impl = { star: starImpl, stones: stonesImpl, smoke: smokeImpl }[style]();
+    impl = { over: overImpl, star: starImpl, stones: stonesImpl, smoke: smokeImpl }[style]();
     entry.addEventListener('click', open);
     layer.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Escape') close(); }); // Space in the text mustn't pause a session
     window.hushFeedback = { open };
