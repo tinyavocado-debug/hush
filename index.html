@@ -149,28 +149,7 @@
     }
     .fb-open:hover { opacity: 1; }
 
-    /* Feedback note: a small warm panel over the picker. */
-    dialog.fb {
-      width: min(440px, calc(100vw - 32px)); padding: 24px 22px 20px; border: 1px solid rgba(239, 230, 216, 0.12);
-      border-radius: 22px; background: #221e1a; color: var(--ink); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
-    }
-    dialog.fb::backdrop { background: rgba(10, 8, 6, 0.6); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
-    .fb h2 { margin: 0 0 6px; font: italic 300 30px/1.1 var(--serif); }
-    .fb p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-faint); }
-    .fb textarea {
-      display: block; width: 100%; margin: 16px 0 6px; padding: 12px 14px; resize: vertical; min-height: 120px;
-      font: 300 16px/1.5 var(--sans); color: var(--ink); background: #1a1714;
-      border: 1px solid rgba(239, 230, 216, 0.16); border-radius: 14px;
-    }
-    .fb textarea:focus { outline: none; border-color: rgba(239, 230, 216, 0.45); }
-    .fb .count { text-align: right; font-size: 11.5px; }
-    .fb .status { min-height: 1.55em; margin-top: 6px; color: var(--ink); }
-    .fb .status.bad { color: #e9a58f; }
-    .fb .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
-    .fb button { font: 400 14px var(--sans); border-radius: 999px; padding: 10px 20px; cursor: pointer; border: 1px solid rgba(239, 230, 216, 0.2); background: none; color: var(--ink); }
-    .fb button.send { background: var(--ink); color: #1a1714; border-color: var(--ink); }
-    .fb button:disabled { opacity: 0.5; cursor: default; }
-    .fb button:focus-visible, .fb-open:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+    .fb-open:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
   </style>
@@ -208,47 +187,8 @@
     <button type="button" class="fb-open" id="fb-open">Ideas, wishes or a problem? Send a note</button>
   </footer>
 
-  <dialog class="fb" id="fb" aria-labelledby="fb-title">
-    <form id="fb-form">
-      <h2 id="fb-title">A note for Hush</h2>
-      <p>Something you'd love to see, something that bothered you, or a bug. It's sent anonymously, so there's no way to reply.</p>
-      <textarea id="fb-text" maxlength="500" required aria-label="Your note" placeholder="I wish…"></textarea>
-      <p class="count" id="fb-count">0 / 500</p>
-      <p class="status" id="fb-status" role="status"></p>
-      <div class="actions">
-        <button type="button" id="fb-close">Close</button>
-        <button class="send" id="fb-send">Send</button>
-      </div>
-    </form>
-  </dialog>
-
   <script src="shared/analytics.js" defer></script>
-  <script>
-  (() => {
-    const $ = (id) => document.getElementById(id);
-    const dlg = $('fb'), text = $('fb-text'), status = $('fb-status'), send = $('fb-send');
-    const say = (msg, bad) => { status.textContent = msg; status.classList.toggle('bad', !!bad); };
-    const count = () => { $('fb-count').textContent = `${text.value.length} / 500`; };
-    $('fb-open').addEventListener('click', () => { say(''); dlg.showModal(); text.focus(); });
-    $('fb-close').addEventListener('click', () => dlg.close());
-    dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); }); // tap outside
-    text.addEventListener('input', () => { count(); if (status.textContent) say(''); });
-    $('fb-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const note = text.value.trim().slice(0, 500);
-      if (!note) return;
-      send.disabled = true; say('Sending…');
-      try {
-        if (!window.hushSend) throw new Error('missing');
-        await window.hushSend(`feedback/${note.replace(/\s+/g, ' ')}`, note);
-        text.value = ''; count();
-        say('Thank you. Your note is on its way.');
-      } catch (err) {
-        say(err.local ? 'Not sent: notes from localhost or your own network aren\'t counted. Try it on the live site.'
-          : 'Couldn\'t send. An ad or tracker blocker, or being offline, can stop it. Your note is still here.', true);
-      } finally { send.disabled = false; }
-    });
-  })();
-  </script>
+  <script src="shared/feedback.js" defer></script>
+  <script>document.getElementById('fb-open').addEventListener('click', () => window.hushFeedback?.open());</script>
 </body>
 </html>

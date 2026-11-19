@@ -4,7 +4,7 @@
 - **Port:** 8766
 - **Main URL:** http://localhost:8766/ (rooms: `/orbit/`, `/ember/`, `/pond/`)
 - **Usage stats:** http://localhost:8766/stats/ reads GoatCounter (tinyavocado.goatcounter.com) with a read-only API token kept in that browser. GoatCounter rate-limits its API (429), so the page spaces its calls, retries, and caches each range for 5 minutes. Events are sent from `shared/analytics.js` (`begin/<room>/<sound>/<breath>/<min>m`, `finished|ended-early/<room>/<min>m`); localhost visits aren't counted.
-- **Notes** (feedback): "Ideas, wishes or a problem? Send a note" under the picker opens a small box; the note goes to GoatCounter as the event `feedback/<text>` (anonymous, max 500 chars) and is listed under **Notes from visitors** on the stats page. Not sent from localhost/LAN; says so visibly if blocked or offline.
+- **Notes** (feedback): on every screen (picker, room setup, end screen; in a session only with the controls), from `shared/feedback.js`. The note goes to GoatCounter as the event `feedback/<where>/<text>` (anonymous, max 500 chars) and is listed under **Notes from visitors** on the stats page. Not sent from localhost/LAN; says so visibly if blocked or offline. Trial since 2026-11-19: **Bubble** (corner icon, centred card), **Quick** (corner pill, bottom sheet with Love it / Something's off / An idea), **Edge** (right-edge tab, side drawer); switch with the left-edge "Note" switcher on localhost or `?fb=`. The picker footer link also opens it.
 
 ## Names
 
