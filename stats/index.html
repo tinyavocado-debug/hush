@@ -86,6 +86,7 @@
     .notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; background: var(--line); border-radius: 8px; overflow: hidden; }
     .notes li { background: var(--panel); padding: 10px 0; font-size: .92rem; color: var(--ink-soft); white-space: pre-wrap; overflow-wrap: anywhere; }
     .notes .where { display: inline-block; margin-right: 10px; font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
+    code { font-size: .85em; color: var(--ink-soft); }
     .notes-err { color: var(--bad); font-size: .88rem; margin: 0; }
   </style>
 </head>
@@ -116,6 +117,13 @@
   </section>
 
   <section class="panel">
+    <h2>Time of day</h2>
+    <div class="days" id="hours"></div>
+    <div class="days-axis"><span>0:00</span><span>6:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+    <p class="note" style="margin-top:10px">Visitors per hour, all days in the range added up. Hours are in the time zone set in your GoatCounter settings.</p>
+  </section>
+
+  <section class="panel">
     <h2>Rooms</h2>
     <div class="scroll"><table id="rooms"></table></div>
   </section>
@@ -132,6 +140,10 @@
     <section class="panel"><h2>Came from</h2><div class="bars" id="refs"></div></section>
     <section class="panel"><h2>Countries</h2><div class="bars" id="countries"></div></section>
     <section class="panel"><h2>Screens</h2><div class="bars" id="sizes"></div></section>
+    <section class="panel"><h2>Systems</h2><div class="bars" id="systems"></div></section>
+    <section class="panel"><h2>Browsers</h2><div class="bars" id="browsers"></div></section>
+    <section class="panel"><h2>Languages</h2><div class="bars" id="languages"></div></section>
+    <section class="panel"><h2>Campaigns</h2><div class="bars" id="campaigns"></div><p class="note" style="margin-top:10px">Visits from links with <code>?utm_campaign=name</code>.</p></section>
   </div>
 
   <p class="note">Numbers come from GoatCounter. It counts each page or event once per visitor in a short window, so someone who starts the same setup twice in a row counts once. Visitors are counted per page, so someone who opens the picker and then a room may count twice. Visitors with ad blockers aren't counted. Your own visits from localhost aren't counted either.</p>
@@ -194,6 +206,13 @@
     const locations = await get('stats/locations', { ...p, limit: 8 });
     const sizes = await get('stats/sizes', { ...p, limit: 8 });
     const refs = await get('stats/toprefs', { ...p, limit: 8 });
+    const systems = await get('stats/systems', { ...p, limit: 8 });
+    const browsers = await get('stats/browsers', { ...p, limit: 8 });
+    const languages = await get('stats/languages', { ...p, limit: 8 });
+    const campaigns = await get('stats/campaigns', { ...p, limit: 8 });
+    const named = (r, empty = 'Unknown') => (r.stats || []).map((s) => ({ name: s.name || s.id || empty, n: s.count }));
+    const perHour = Array(24).fill(0);
+    (total.stats || []).forEach((s) => (s.hourly || []).forEach((n, h) => (perHour[h] += n || 0)));
     const data = {
       visitors: total.total,
       perDay: (total.stats || []).map((s) => ({ day: s.day, n: s.daily })),
@@ -201,6 +220,7 @@
       countries: (locations.stats || []).map((s) => ({ name: s.name || 'Unknown', n: s.count })),
       sizes: (sizes.stats || []).map((s) => ({ name: s.name || s.id || 'Unknown', n: s.count })),
       refs: (refs.stats || []).map((s) => ({ name: s.name || '(direct or unknown)', n: s.count })),
+      perHour, systems: named(systems), browsers: named(browsers), languages: named(languages), campaigns: named(campaigns),
     };
     cache[n] = { at: Date.now(), data };
     return data;
@@ -251,6 +271,11 @@
       countries: [{ name: 'Netherlands', n: 40 }, { name: 'United States', n: 31 }, { name: 'Germany', n: 12 }],
       sizes: [{ name: 'Phones', n: 58 }, { name: 'Computers', n: 29 }, { name: 'Tablets', n: 7 }],
       refs: [{ name: '(direct or unknown)', n: 70 }, { name: 'github.com', n: 9 }],
+      perHour: Array.from({ length: 24 }, (_, h) => Math.round(2 + 10 * Math.exp(-(Math.min(Math.abs(h - 22), 24 - Math.abs(h - 22)) ** 2) / 8) + 6 * Math.exp(-((h - 7) ** 2) / 4))),
+      systems: [{ name: 'iOS', n: 44 }, { name: 'Android', n: 16 }, { name: 'macOS', n: 21 }, { name: 'Windows', n: 9 }],
+      browsers: [{ name: 'Safari', n: 48 }, { name: 'Chrome', n: 33 }, { name: 'Firefox', n: 6 }],
+      languages: [{ name: 'English', n: 52 }, { name: 'Dutch', n: 30 }, { name: 'German', n: 9 }],
+      campaigns: [],
     };
   }
 
@@ -311,6 +336,9 @@
     $('d-max').textContent = `busiest day: ${max}`;
     $('d-last').textContent = short(d.perDay.at(-1)?.day);
 
+    const hmax = Math.max(1, ...d.perHour);
+    $('hours').innerHTML = d.perHour.map((n, h) => `<div style="height:${(100 * n) / hmax}%" title="${h}:00–${h + 1}:00: ${n}"></div>`).join('');
+
     $('rooms').innerHTML = `<tr><th>Room</th><th>Visitors</th><th>Started</th><th>To the end</th><th>Rested</th><th>Top sound</th></tr>` +
       Object.entries(s.room).map(([k, r]) => {
         const top = Object.entries(r.sounds).sort((a, b) => b[1] - a[1])[0];
@@ -324,6 +352,7 @@
     bars($('refs'), d.refs, (n) => n);
     bars($('countries'), d.countries, (n) => n);
     bars($('sizes'), d.sizes, (n) => n);
+    ['systems', 'browsers', 'languages', 'campaigns'].forEach((k) => bars($(k), d[k], (n) => n));
   }
 
   /* ───── status banner: sample, error, or connected ───── */
