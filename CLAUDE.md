@@ -17,6 +17,8 @@
 
 ## Settled
 
+- The picker's background is **Lanterns** (chosen 2026-11-19, replacing the old brown): a quiet midnight blue-black, and each room's card glows in its own colour (violet, amber, teal) like a lit window, the glows breathing slowly out of step. The rule: the background stays neutral and the cards bring the colour. Also tried: Aurora, Dusk, Inkwash, Fireflies, Opal and Jellies (they brought their own colours, which fought the cards), Thread (a twilight running indigo, wine, teal under the cards) and Moonstone (pale grey, each card casting a coloured shadow).
+
 - Every soundscape follows the visuals' breath curve (`breathCurve` in `shared/core.js`), so sound and scene rise and settle together.
 - Ember's Drone uses **cues**: a high chime as each breath in starts, a low one as each breath out starts, over a gentle bloom of upper tones and air. (Also tried: a wider swing, and separate in/out textures.)
 - Ember's stick: the original tip and straight ash, plus a few **sparks** rising from the tip as each breath in starts (with the high chime), and the ash dropping as each breath out starts, so the smoke gives a small jump. Also tried and dropped: smoke rings on each breath out, stirring the smoke by touch, and a glowing coal with curling ash.
