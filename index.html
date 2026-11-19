@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1a1714">
+  <meta name="theme-color" content="#0a0c12">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -23,13 +23,13 @@
       --ink-faint: rgba(239, 230, 216, 0.5);
     }
     * { box-sizing: border-box; }
-    html, body { margin: 0; min-height: 100%; background: #1a1714; color: var(--ink); }
+    html, body { margin: 0; min-height: 100%; background: #0a0c12; color: var(--ink); }
+    html { background: radial-gradient(120% 75% at 50% 0%, #161a28 0%, #0c0e15 55%, #08090d 100%) fixed #0a0c12; }
     body {
       font-family: var(--sans);
       font-weight: 300;
       -webkit-font-smoothing: antialiased;
-      background: radial-gradient(120% 60% at 50% 0%, #2a2520 0%, #1a1714 70%);
-      background-color: #1a1714;
+      background: transparent;
       padding: calc(env(safe-area-inset-top) + 36px) 16px calc(env(safe-area-inset-bottom) + 28px);
     }
     header { text-align: center; margin: 0 auto 26px; max-width: 520px; }
@@ -68,6 +68,16 @@
     .card h2 { margin: 0 0 4px; font: 300 38px/1 var(--serif); }
     .card p { margin: 0; font-size: 14px; line-height: 1.55; opacity: 0.78; max-width: 34ch; }
     .card .how { margin-top: 12px; font-size: 10.5px; letter-spacing: 0.24em; text-transform: uppercase; opacity: 0.6; }
+
+    /* Lanterns: each room glows in its own colour on a quiet midnight, the glows breathing slowly out of step */
+    .card { box-shadow: 0 0 0 1px rgba(var(--glow), .14), 0 30px 120px -24px rgba(var(--glow), .3); animation: lantern 10s ease-in-out infinite alternate; }
+    .orbit { --glow: 104, 80, 240; }
+    .ember { --glow: 240, 150, 70; animation-delay: -3.3s; }
+    .pond { --glow: 50, 180, 145; animation-delay: -6.6s; }
+    @keyframes lantern {
+      from { box-shadow: 0 0 0 1px rgba(var(--glow), .12), 0 26px 90px -30px rgba(var(--glow), .22); }
+      to { box-shadow: 0 0 0 1px rgba(var(--glow), .22), 0 34px 150px -16px rgba(var(--glow), .5); }
+    }
 
     /* Orbit */
     .orbit { --c-ink: #eadfcb; background: radial-gradient(75% 45% at 50% 38%, #3b2a8a 0%, #1a1650 35%, #070618 75%, #04030c 100%); }
@@ -143,6 +153,13 @@
     @keyframes swim { to { transform: rotate(360deg); } }
 
     footer { margin: 26px auto 0; max-width: 520px; text-align: center; font-size: 12.5px; line-height: 1.7; color: var(--ink-faint); }
+    .fb-open {
+      display: inline-block; margin-top: 10px; padding: 6px 2px; font: inherit; font-size: 13px; color: var(--ink);
+      background: none; border: 0; border-bottom: 1px solid rgba(239, 230, 216, 0.3); cursor: pointer; opacity: 0.85;
+    }
+    .fb-open:hover { opacity: 1; }
+
+    .fb-open:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
   </style>
@@ -175,7 +192,13 @@
     </a>
   </nav>
 
-  <footer>Tip: add this page to your home screen for a full-screen, distraction-free timer.</footer>
+  <footer>
+    Tip: add this page to your home screen for a full-screen, distraction-free timer.<br>
+    <button type="button" class="fb-open" id="fb-open">Ideas, wishes or a problem? Send a note</button>
+  </footer>
+
   <script src="shared/analytics.js" defer></script>
+  <script src="shared/feedback.js" defer></script>
+  <script>document.getElementById('fb-open').addEventListener('click', () => window.hushFeedback?.open());</script>
 </body>
 </html>

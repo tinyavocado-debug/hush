@@ -8,6 +8,7 @@
   if (!CODE) {
     console.warn('[hush] analytics off: set CODE in shared/analytics.js');
     window.hushTrack = (name) => console.info('[hush] (not sent)', name);
+    window.hushSend = async () => { throw new Error('analytics off'); };
     return;
   }
 
@@ -22,5 +23,19 @@
     const send = () => window.goatcounter.count({ path: name, title: name, event: true });
     if (window.goatcounter?.count) send();
     else s.addEventListener('load', send, { once: true });
+  };
+
+  // Sends one event straight to GoatCounter and rejects if it can't get there (blocked,
+  // offline), so the caller can say so. count.js can't tell us that. Used for feedback notes,
+  // which show on the stats page. Like count.js, it skips local and LAN addresses.
+  const LOCAL = /(localhost$|^127\.|^10\.|^172\.(1[6-9]|2[0-9]|3[0-1])\.|^192\.168\.|^0\.0\.0\.0$|^\[::1\]$)/;
+  window.hushSend = async (path, title) => {
+    if (location.protocol === 'file:' || LOCAL.test(location.hostname)) throw Object.assign(new Error('local'), { local: true });
+    const q = new URLSearchParams({
+      p: path, t: title, e: 'true',
+      s: [screen.width, screen.height, window.devicePixelRatio || 1].join(','),
+      rnd: Math.random().toString(36).slice(2),
+    });
+    await fetch(`https://${CODE}.goatcounter.com/count?${q}`, { mode: 'no-cors', keepalive: true, credentials: 'omit' });
   };
 })();

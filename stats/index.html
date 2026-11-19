@@ -83,6 +83,29 @@
     .row .n { text-align: right; font-variant-numeric: tabular-nums; }
     .empty { color: var(--ink-faint); font-size: .88rem; margin: 0; }
     .note { color: var(--ink-faint); font-size: .8rem; margin: 0; max-width: 70ch; }
+    .notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; background: var(--line); border-radius: 8px; overflow: hidden; }
+    .notes li { background: var(--panel); padding: 10px 0; font-size: .92rem; color: var(--ink-soft); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .notes .where { display: inline-block; margin-right: 10px; font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
+    code { font-size: .85em; color: var(--ink-soft); }
+    .jhead { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 16px; }
+    .jhead .note { flex: 1 1 260px; }
+    .btn:disabled { opacity: .45; cursor: default; }
+    .jgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 22px; }
+    @media (max-width: 640px) { .jgrid { grid-template-columns: 1fr; } }
+    h3 { font: 400 .8rem var(--sans); color: var(--ink-faint); margin: 0 0 10px; }
+    .paths, .visits { list-style: none; margin: 0 0 22px; padding: 0; display: grid; gap: 1px; background: var(--line); border-radius: 8px; overflow: hidden; }
+    .paths li, .visits li { background: var(--panel); padding: 8px 0; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
+    .visits li { grid-template-columns: 7.5rem 1fr; }
+    .visits time { font-size: .8rem; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+    .path { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: .84rem; min-width: 0; }
+    .chip { border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; color: var(--ink-soft); }
+    .chip.orbit { border-color: color-mix(in srgb, var(--orbit) 55%, transparent); }
+    .chip.ember { border-color: color-mix(in srgb, var(--ember) 55%, transparent); }
+    .chip.pond { border-color: color-mix(in srgb, var(--pond) 55%, transparent); }
+    .chip.end { background: var(--line); }
+    .arrow { color: var(--ink-faint); font-size: .75rem; }
+    .paths .n { font-variant-numeric: tabular-nums; }
+    .notes-err { color: var(--bad); font-size: .88rem; margin: 0; }
   </style>
 </head>
 <body>
@@ -112,8 +135,32 @@
   </section>
 
   <section class="panel">
+    <h2>Time of day</h2>
+    <div class="days" id="hours"></div>
+    <div class="days-axis"><span>0:00</span><span>6:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+    <p class="note" style="margin-top:10px">Visitors per hour, all days in the range added up. Hours are in the time zone set in your GoatCounter settings.</p>
+  </section>
+
+  <section class="panel">
     <h2>Rooms</h2>
     <div class="scroll"><table id="rooms"></table></div>
+  </section>
+
+  <section class="panel">
+    <h2>Journeys</h2>
+    <div class="jhead">
+      <p class="note" id="j-status"></p>
+      <button type="button" class="btn" id="j-load">Load journeys</button>
+      <label class="link">or open an export file<input type="file" id="j-file" accept=".csv,.gz,text/csv,application/gzip" hidden></label>
+    </div>
+    <p class="notes-err" id="j-err" hidden></p>
+    <div id="journeys"></div>
+    <p class="note">A visit is one browser on one connection, for up to 8 hours (GoatCounter's session). It's an anonymous random ID; nobody is followed from one day to the next. Needs “Individual pageviews” on in GoatCounter (Settings → Data collection), and only visits from then on are there.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Notes from visitors</h2>
+    <div id="notes"></div>
   </section>
 
   <div class="grid2">
@@ -123,6 +170,10 @@
     <section class="panel"><h2>Came from</h2><div class="bars" id="refs"></div></section>
     <section class="panel"><h2>Countries</h2><div class="bars" id="countries"></div></section>
     <section class="panel"><h2>Screens</h2><div class="bars" id="sizes"></div></section>
+    <section class="panel"><h2>Systems</h2><div class="bars" id="systems"></div></section>
+    <section class="panel"><h2>Browsers</h2><div class="bars" id="browsers"></div></section>
+    <section class="panel"><h2>Languages</h2><div class="bars" id="languages"></div></section>
+    <section class="panel"><h2>Campaigns</h2><div class="bars" id="campaigns"></div><p class="note" style="margin-top:10px">Visits from links with <code>?utm_campaign=name</code>.</p></section>
   </div>
 
   <p class="note">Numbers come from GoatCounter. It counts each page or event once per visitor in a short window, so someone who starts the same setup twice in a row counts once. Visitors are counted per page, so someone who opens the picker and then a room may count twice. Visitors with ad blockers aren't counted. Your own visits from localhost aren't counted either.</p>
@@ -151,17 +202,20 @@
   // and a 429 waits and tries again (shown in the banner) before giving up.
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   let lastCall = 0, gen = 0;
-  async function api(token, path, params, myGen) {
-    const q = new URLSearchParams(params).toString();
+  // myGen undefined: not tied to a range (journeys). opts: { method, body, raw, once }.
+  async function api(token, path, params, myGen, opts = {}) {
+    const q = new URLSearchParams(params || {}).toString();
     let r;
     for (let attempt = 0; ; attempt++) {
       await wait(Math.max(0, lastCall + 500 - Date.now()));
-      if (myGen !== gen) throw Object.assign(new Error('superseded'), { superseded: true });
+      if (myGen !== undefined && myGen !== gen) throw Object.assign(new Error('superseded'), { superseded: true });
       lastCall = Date.now();
-      r = await fetch(`${SITE}/api/v0/${path}?${q}`, {
+      r = await fetch(`${SITE}/api/v0/${path}${q ? `?${q}` : ''}`, {
+        method: opts.method || 'GET',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        ...(opts.body ? { body: JSON.stringify(opts.body) } : {}),
       });
-      if (r.status !== 429 || attempt === 4) break;
+      if (r.status !== 429 || attempt === 4 || opts.once) break;
       const secs = Math.max(+r.headers.get('Retry-After') || 0, 2 ** attempt * 2);
       banner('', `<p>GoatCounter asked to slow down; trying again in ${secs}s…</p>`);
       await wait(secs * 1000);
@@ -171,7 +225,7 @@
       const body = await r.text().catch(() => '');
       const e = new Error(`${path}: ${r.status} ${body.slice(0, 200)}`); e.status = r.status; throw e;
     }
-    return r.json();
+    return opts.raw ? r : r.json();
   }
   const cache = {}; // per range, for 5 minutes, so switching back doesn't ask again
   async function load(token, n, myGen) {
@@ -185,6 +239,13 @@
     const locations = await get('stats/locations', { ...p, limit: 8 });
     const sizes = await get('stats/sizes', { ...p, limit: 8 });
     const refs = await get('stats/toprefs', { ...p, limit: 8 });
+    const systems = await get('stats/systems', { ...p, limit: 8 });
+    const browsers = await get('stats/browsers', { ...p, limit: 8 });
+    const languages = await get('stats/languages', { ...p, limit: 8 });
+    const campaigns = await get('stats/campaigns', { ...p, limit: 8 });
+    const named = (r, empty = 'Unknown') => (r.stats || []).map((s) => ({ name: s.name || s.id || empty, n: s.count }));
+    const perHour = Array(24).fill(0);
+    (total.stats || []).forEach((s) => (s.hourly || []).forEach((n, h) => (perHour[h] += n || 0)));
     const data = {
       visitors: total.total,
       perDay: (total.stats || []).map((s) => ({ day: s.day, n: s.daily })),
@@ -192,9 +253,202 @@
       countries: (locations.stats || []).map((s) => ({ name: s.name || 'Unknown', n: s.count })),
       sizes: (sizes.stats || []).map((s) => ({ name: s.name || s.id || 'Unknown', n: s.count })),
       refs: (refs.stats || []).map((s) => ({ name: s.name || '(direct or unknown)', n: s.count })),
+      perHour, systems: named(systems), browsers: named(browsers), languages: named(languages), campaigns: named(campaigns),
     };
     cache[n] = { at: Date.now(), data };
     return data;
+  }
+
+  // Notes sent from the picker are events named "feedback/<text>". GoatCounter's path list
+  // has every path ever seen, oldest first, regardless of the date range.
+  let notesCache = null;
+  async function loadNotes(token, myGen) {
+    if (notesCache && Date.now() - notesCache.at < 5 * 60e3) return notesCache.notes;
+    const notes = [];
+    let after = 0, more = true;
+    for (let page = 0; more && page < 10; page++) {
+      const r = await api(token, 'paths', { limit: 200, ...(after ? { after } : {}) }, myGen);
+      for (const x of r.paths || []) {
+        const rest = x.path.replace(/^\/*feedback\//, '');
+        if (!x.event || rest === x.path.replace(/^\/+/, '')) continue;
+        const m = rest.match(/^(picker|orbit|ember|pond)\//); // "feedback/<where>/<text>"
+        notes.push({ where: m ? m[1] : '', text: x.title || rest.slice(m ? m[0].length : 0) });
+      }
+      more = !!r.more && (r.paths || []).length > 0;
+      after = (r.paths || []).at(-1)?.id;
+    }
+    notesCache = { at: Date.now(), notes: notes.reverse(), cut: more };
+    return notesCache.notes;
+  }
+  function renderNotes(list, cut) {
+    $('notes').innerHTML = list.length
+      ? `<ul class="notes">${list.map((n) => `<li>${n.where ? `<span class="where">${n.where === 'picker' ? 'Picker' : ROOMS[n.where]}</span>` : ''}${esc(n.text)}</li>`).join('')}</ul>` + (cut ? '<p class="note" style="margin-top:10px">Only the first 2,000 paths were checked; older notes may be missing.</p>' : '')
+      : '<p class="empty">No notes yet.</p>';
+  }
+
+  /* ───── journeys: GoatCounter's export has an anonymous session ID per visit ───── */
+  const J_KEY = 'hush.stats.journeys';
+  let jdata = null, jbusy = false, jerr = '';
+  try { jdata = JSON.parse(localStorage.getItem(J_KEY)); } catch {} // { rows: [[session, path, event 0/1, ms]], last, at }
+
+  function parseCSV(text) {
+    const out = []; let row = [], f = '', q = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) { if (c !== '"') f += c; else if (text[i + 1] === '"') { f += '"'; i++; } else q = false; }
+      else if (c === '"') q = true;
+      else if (c === ',') { row.push(f); f = ''; }
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && text[i + 1] === '\n') i++;
+        row.push(f); f = ''; if (row.length > 1 || row[0]) out.push(row); row = [];
+      } else f += c;
+    }
+    if (f || row.length) { row.push(f); out.push(row); }
+    return out;
+  }
+  function exportRows(text) {
+    const [head, ...rest] = parseCSV(text);
+    if (!head) return [];
+    const v = parseInt(head[0], 10);
+    if (v !== 2) throw new Error(`GoatCounter's export is format version ${v || '?'}; this page reads version 2.`);
+    const col = (name) => head.findIndex((h, i) => (i === 0 ? h.replace(/^\d+,?/, '') : h) === name);
+    const P = col('Path'), E = col('Event'), S = col('Session'), B = col('Bot'), D = col('Date');
+    if ([P, E, S, D].includes(-1)) throw new Error('The export has no Path, Event, Session or Date column.');
+    return rest.filter((r) => r.length > D && (B < 0 || r[B] === '0' || r[B] === ''))
+      .map((r) => [r[S], r[P], r[E] === 'true' ? 1 : 0, Date.parse(r[D])]);
+  }
+  async function exportText(buf) {
+    const b = new Uint8Array(buf);
+    if (b[0] === 0x1f && b[1] === 0x8b) return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+    return new TextDecoder().decode(buf);
+  }
+  // GoatCounter builds the export in the background (one per hour); later ones only fetch newer rows.
+  async function fetchExport(token, since) {
+    jstatus('Asking GoatCounter for an export…');
+    const ex = await api(token, 'export', null, undefined, { method: 'POST', once: true, body: { format: 'csv', ...(since ? { start_from_hit_id: since } : {}) } });
+    let done;
+    for (let i = 1; i <= 60 && !done; i++) {
+      await wait(3000);
+      const x = await api(token, `export/${ex.id}`, null, undefined);
+      if (x.error) throw new Error(`GoatCounter's export failed: ${x.error}`);
+      if (x.finished_at) done = x; else jstatus(`GoatCounter is preparing the export… ${i * 3}s`);
+    }
+    if (!done) throw new Error('the export took more than 3 minutes. Try again later.');
+    jstatus('Downloading…');
+    const r = await api(token, `export/${ex.id}/download`, null, undefined, { raw: true });
+    return { rows: exportRows(await exportText(await r.arrayBuffer())), last: done.last_hit_id || since || 0 };
+  }
+  function saveJ() {
+    try { localStorage.setItem(J_KEY, JSON.stringify(jdata)); }
+    catch { jerr = 'Too much to keep in this browser, so it will export everything again next time.'; }
+  }
+  async function loadJourneys() {
+    const token = store.get('hush.stats.token');
+    if (!token || jbusy) return;
+    jbusy = true; jerr = ''; renderJourneys();
+    try {
+      const since = jdata?.last || 0, got = await fetchExport(token, since);
+      jdata = { rows: since ? jdata.rows.concat(got.rows) : got.rows, last: got.last, at: Date.now() };
+      saveJ();
+    } catch (e) {
+      jerr = e.status === 401 || e.status === 403 ? 'This token isn\'t allowed to export. Make a new one with “Read statistics” and “Export” ticked, then Disconnect above and paste it.'
+        : e instanceof TypeError ? 'Couldn\'t reach GoatCounter\'s export (a blocker, or offline). You can download it in GoatCounter under Settings → Export and open the file here.'
+        : e.status === 429 || /hour/i.test(e.message) ? 'GoatCounter allows one export an hour. Try again later.'
+        : `Couldn't load journeys: ${e.message}`;
+    } finally { jbusy = false; renderJourneys(); }
+  }
+  async function openExportFile(file) {
+    jerr = '';
+    try { jdata = { rows: exportRows(await exportText(await file.arrayBuffer())), last: 0, at: Date.now(), file: file.name }; saveJ(); }
+    catch (e) { jerr = `Couldn't read ${file.name}: ${e.message}`; }
+    renderJourneys();
+  }
+
+  function step(path, ev) {
+    const p = path.replace(/^\/+/, '').replace(/^hush\//, '').split('?')[0], s = p.split('/');
+    if (!ev) {
+      if (p === '' || p === 'index.html') return { k: 'picker' };
+      const m = p.match(/^(orbit|ember|pond)(\/|\/index\.html)?$/);
+      return m ? { k: 'room', room: m[1] } : null;
+    }
+    if (s[0] === 'begin' && ROOMS[s[1]]) return { k: 'begin', room: s[1], sound: s[2] || '', breath: s[3] || '', len: s[4] || '' };
+    if ((s[0] === 'finished' || s[0] === 'ended-early') && ROOMS[s[1]]) return { k: s[0] === 'finished' ? 'finished' : 'early', room: s[1], len: s[2] || '' };
+    if (s[0] === 'feedback') return { k: 'note' };
+    return null;
+  }
+  function visits(rows, n) {
+    const from = Date.parse(range(n).start), by = new Map();
+    for (const r of rows) if (r[3] >= from) { if (!by.has(r[0])) by.set(r[0], []); by.get(r[0]).push(r); }
+    const out = [];
+    for (const rs of by.values()) {
+      rs.sort((a, b) => a[3] - b[3]);
+      const steps = [];
+      for (const r of rs) {
+        const x = step(r[1], r[2]), prev = steps.at(-1);
+        if (!x) continue;
+        if (prev && (x.k === 'picker' || x.k === 'room') && prev.k === x.k && prev.room === x.room) continue; // a reload
+        steps.push(x);
+      }
+      if (steps.length) out.push({ steps, start: rs[0][3] });
+    }
+    return out.sort((a, b) => b.start - a.start);
+  }
+  const SHORT = { picker: 'Picker', begin: 'Began', finished: 'Finished', early: 'Ended early', note: 'Note' };
+  const ENDED = { picker: 'At the picker', room: 'Room, not started', begin: 'Mid-session, no end', finished: 'After finishing', early: 'After ending early', note: 'After sending a note' };
+  const chip = (x, detail) => {
+    const len = parseInt(x.len, 10);
+    const text = !detail ? (x.k === 'room' ? ROOMS[x.room] : SHORT[x.k])
+      : x.k === 'room' ? ROOMS[x.room] : x.k === 'begin' ? [cap(x.sound), breathName(x.breath), len ? `${len} min` : ''].filter(Boolean).join(' · ')
+      : x.k === 'finished' ? `Finished${len ? ` (${len} min)` : ''}` : x.k === 'early' ? `Ended early${len ? ` (${len} min)` : ''}` : SHORT[x.k];
+    const cls = ['chip', x.room || '', x.k === 'finished' || x.k === 'early' ? 'end' : ''].join(' ');
+    return `<span class="${cls}">${esc(text)}</span>`;
+  };
+  const pathHTML = (steps, detail) => `<span class="path">${steps.map((x) => chip(x, detail)).join('<span class="arrow">→</span>')}</span>`;
+
+  function jstatus(t) { $('j-status').textContent = t; }
+  function renderJourneys() {
+    const token = store.get('hush.stats.token'), real = !!(token || jdata?.file);
+    const rows = real ? jdata?.rows : sampleRows(days);
+    $('j-load').textContent = jdata?.rows && !jdata.file ? 'Get newer visits' : 'Load journeys';
+    $('j-load').disabled = !token || jbusy;
+    $('j-err').hidden = !jerr; $('j-err').textContent = jerr;
+    if (jbusy) return;
+    jstatus(!real ? 'Sample journeys (made up). Connect GoatCounter above to load real ones.'
+      : !rows ? 'Not loaded yet. Loading asks GoatCounter for an export (allowed once an hour); it can take a minute.'
+      : `${jdata.file ? `From ${jdata.file}` : 'Export'}, loaded ${new Date(jdata.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}.`);
+    if (!rows) { $('journeys').innerHTML = ''; return; }
+    const vs = visits(rows, days);
+    if (!vs.length) {
+      $('journeys').innerHTML = `<p class="empty" style="margin-bottom:16px">No visits in this range${rows.length ? '' : ' (the export is empty)'}.</p>`;
+      return;
+    }
+    const has = (v, k) => v.steps.some((x) => x.k === k);
+    const funnel = [
+      ['Visits', vs.length],
+      ['Opened a room', vs.filter((v) => has(v, 'room') || has(v, 'begin')).length],
+      ['Began a session', vs.filter((v) => has(v, 'begin')).length],
+      ['Stayed to the end', vs.filter((v) => has(v, 'finished')).length],
+      ['Began 2 or more', vs.filter((v) => v.steps.filter((x) => x.k === 'begin').length > 1).length],
+      ['Tried 2 or more rooms', vs.filter((v) => new Set(v.steps.map((x) => x.room).filter(Boolean)).size > 1).length],
+    ].map(([name, n]) => ({ name, n }));
+    const ended = {}, common = {};
+    for (const v of vs) {
+      const e = ENDED[v.steps.at(-1).k]; ended[e] = (ended[e] || 0) + 1;
+      const key = v.steps.map((x) => `${x.k}:${x.room || ''}`).join('|');
+      (common[key] ||= { steps: v.steps, n: 0 }).n++;
+    }
+    const top = Object.values(common).sort((a, b) => b.n - a.n).slice(0, 8);
+    const when = (t) => new Date(t).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    $('journeys').innerHTML = `<div class="jgrid">
+        <div><h3>Out of ${vs.length} visits</h3><div class="bars" id="j-funnel"></div></div>
+        <div><h3>Where visits ended</h3><div class="bars" id="j-ended"></div></div>
+      </div>
+      <h3>Most common paths</h3>
+      <ul class="paths">${top.map((c) => `<li>${pathHTML(c.steps, false)}<span class="n">${c.n}</span></li>`).join('')}</ul>
+      <h3>Latest visits</h3>
+      <ul class="visits">${vs.slice(0, 12).map((v) => `<li><time>${when(v.start)}</time>${pathHTML(v.steps, true)}</li>`).join('')}</ul>`;
+    bars($('j-funnel'), funnel, (n) => n, true);
+    bars($('j-ended'), toList(ended), (n) => n);
   }
 
   /* ───── sample data: only shown, and labelled, until a token is connected ───── */
@@ -215,7 +469,33 @@
       countries: [{ name: 'Netherlands', n: 40 }, { name: 'United States', n: 31 }, { name: 'Germany', n: 12 }],
       sizes: [{ name: 'Phones', n: 58 }, { name: 'Computers', n: 29 }, { name: 'Tablets', n: 7 }],
       refs: [{ name: '(direct or unknown)', n: 70 }, { name: 'github.com', n: 9 }],
+      perHour: Array.from({ length: 24 }, (_, h) => Math.round(2 + 10 * Math.exp(-(Math.min(Math.abs(h - 22), 24 - Math.abs(h - 22)) ** 2) / 8) + 6 * Math.exp(-((h - 7) ** 2) / 4))),
+      systems: [{ name: 'iOS', n: 44 }, { name: 'Android', n: 16 }, { name: 'macOS', n: 21 }, { name: 'Windows', n: 9 }],
+      browsers: [{ name: 'Safari', n: 48 }, { name: 'Chrome', n: 33 }, { name: 'Firefox', n: 6 }],
+      languages: [{ name: 'English', n: 52 }, { name: 'Dutch', n: 30 }, { name: 'German', n: 9 }],
+      campaigns: [],
     };
+  }
+
+  function sampleRows(n) {
+    let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const P = [
+      [9, ['/hush/']],
+      [14, ['/hush/', '/hush/orbit/', 'begin/orbit/float/steady/10m', 'finished/orbit/10m']],
+      [6, ['/hush/', '/hush/ember/']],
+      [7, ['/hush/orbit/', 'begin/orbit/voyage/balance/20m']],
+      [5, ['/hush/', '/hush/pond/', 'begin/pond/garden/long+hold/10m', 'ended-early/pond/4m']],
+      [4, ['/hush/', '/hush/orbit/', '/hush/', '/hush/ember/', 'begin/ember/drone/steady/15m', 'finished/ember/15m']],
+      [3, ['/hush/', '/hush/pond/', 'begin/pond/rain/sleep/30m', 'finished/pond/30m', 'feedback/pond/night version?']],
+    ];
+    const rows = [], now = Date.now(), total = P.reduce((a, p) => a + p[0], 0);
+    for (let i = 0; i < Math.round(n * 2.2); i++) {
+      let w = rnd() * total, pat = P[0][1];
+      for (const [k, p] of P) if ((w -= k) < 0) { pat = p; break; }
+      const t0 = now - rnd() * (n - 0.2) * 864e5;
+      pat.forEach((path, j) => rows.push([`s${i}`, path, path.startsWith('/') ? 0 : 1, t0 + j * 9e4]));
+    }
+    return rows;
   }
 
   /* ───── turning event paths into numbers ───── */
@@ -250,10 +530,11 @@
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
-  function bars(el, list, fmt = cap) {
-    list = list.filter((x) => x.n > 0).sort((a, b) => b.n - a.n).slice(0, 8);
+  function bars(el, list, fmt = cap, keepOrder = false) {
+    list = list.filter((x) => x.n > 0);
+    if (!keepOrder) list = list.sort((a, b) => b.n - a.n).slice(0, 8);
     if (!list.length) { el.innerHTML = '<p class="empty">Nothing yet.</p>'; return; }
-    const max = list[0].n;
+    const max = Math.max(...list.map((x) => x.n));
     el.innerHTML = list.map((x) => `<div class="row"><span class="name" title="${esc(fmt(x.name))}">${esc(fmt(x.name))}</span>
       <span class="track"><span class="fill" style="display:block;width:${(100 * x.n) / max}%"></span></span><span class="n">${x.n}</span></div>`).join('');
   }
@@ -275,6 +556,9 @@
     $('d-max').textContent = `busiest day: ${max}`;
     $('d-last').textContent = short(d.perDay.at(-1)?.day);
 
+    const hmax = Math.max(1, ...d.perHour);
+    $('hours').innerHTML = d.perHour.map((n, h) => `<div style="height:${(100 * n) / hmax}%" title="${h}:00–${h + 1}:00: ${n}"></div>`).join('');
+
     $('rooms').innerHTML = `<tr><th>Room</th><th>Visitors</th><th>Started</th><th>To the end</th><th>Rested</th><th>Top sound</th></tr>` +
       Object.entries(s.room).map(([k, r]) => {
         const top = Object.entries(r.sounds).sort((a, b) => b[1] - a[1])[0];
@@ -288,19 +572,22 @@
     bars($('refs'), d.refs, (n) => n);
     bars($('countries'), d.countries, (n) => n);
     bars($('sizes'), d.sizes, (n) => n);
+    ['systems', 'browsers', 'languages', 'campaigns'].forEach((k) => bars($(k), d[k], (n) => n));
   }
 
   /* ───── status banner: sample, error, or connected ───── */
   function banner(kind, html) { $('status').innerHTML = html ? `<div class="banner ${kind}">${html}</div>` : ''; }
   const connectForm = `<form id="connect"><input id="token" type="password" autocomplete="off" placeholder="Paste a GoatCounter API token" aria-label="GoatCounter API token"><button class="btn">Connect</button></form>
-    <p class="note">Make one at <a href="${SITE}/user/api" target="_blank" rel="noopener">${SITE.replace('https://', '')}/user/api</a> with only “Read statistics” ticked. It's kept in this browser only.</p>`;
+    <p class="note">Make one at <a href="${SITE}/user/api" target="_blank" rel="noopener">${SITE.replace('https://', '')}/user/api</a> with “Read statistics” ticked (and “Export”, for Journeys). It's kept in this browser only.</p>`;
 
   async function refresh() {
     document.querySelectorAll('[data-days]').forEach((b) => b.setAttribute('aria-pressed', +b.dataset.days === days));
+    renderJourneys();
     const token = store.get('hush.stats.token');
     if (!token) {
       banner('', `<p><b>Sample data.</b> These numbers are made up to show the layout. Connect GoatCounter to see real usage.</p>${connectForm}`);
       render(sample(days));
+      renderNotes([{ where: 'pond', text: 'Idea: I wish Pond had a night version.' }, { where: 'orbit', text: 'Love it: The Float choir is lovely. Could the session be 45 minutes?' }]);
       return;
     }
     const myGen = ++gen; // a newer refresh (range switch) replaces this one
@@ -311,6 +598,13 @@
       render(d);
       banner('', d.more ? '<p>Showing the top 200 pages and events; some rare setups are left out.</p>' : '');
       $('status').insertAdjacentHTML('beforeend', '<button type="button" class="link" id="forget">Disconnect</button>');
+      try {
+        const notes = await loadNotes(token, myGen);
+        if (myGen === gen) renderNotes(notes, notesCache.cut);
+      } catch (e) {
+        if (e.superseded || myGen !== gen) return;
+        $('notes').innerHTML = `<p class="notes-err">Couldn't load notes: ${e.status === 401 || e.status === 403 ? 'the token isn\'t allowed to list paths.' : esc(e.message)}</p>`;
+      }
     } catch (e) {
       if (e.superseded || myGen !== gen) return;
       const blocked = e instanceof TypeError; // no reply at all
@@ -322,6 +616,8 @@
     }
   }
 
+  $('j-load').addEventListener('click', loadJourneys);
+  $('j-file').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) openExportFile(f); e.target.value = ''; });
   document.addEventListener('submit', (e) => {
     if (e.target.id !== 'connect') return;
     e.preventDefault();
@@ -329,7 +625,7 @@
     if (v) { store.set('hush.stats.token', v); refresh(); }
   });
   document.addEventListener('click', (e) => {
-    if (e.target.id === 'forget') { store.set('hush.stats.token', null); Object.keys(cache).forEach((k) => delete cache[k]); refresh(); }
+    if (e.target.id === 'forget') { store.set('hush.stats.token', null); Object.keys(cache).forEach((k) => delete cache[k]); notesCache = null; refresh(); }
     const b = e.target.closest('[data-days]');
     if (b) { days = +b.dataset.days; store.set('hush.stats.days', days); refresh(); }
   });
