@@ -577,9 +577,9 @@
       temple(c) {
         // The fundamental stays steady; the upper tones bloom and a breath of air brightens on
         // the in-breath. A high note marks the start of each in-breath, a low one each out-breath.
-        const high = gain(0.35);
+        const high = gain(0.35); // the low hum (98, 147 Hz) half its old level, a little quieter (2026-11-27)
         high.connect(c.bed);
-        [[98, 0.16, c.bed], [98.35, 0.03, c.bed], [147, 0.08, c.bed], [196.2, 0.09, high], [293.7, 0.05, high], [392.4, 0.03, high]].forEach(([f, a, out], i) => {
+        [[98, 0.08, c.bed], [98.35, 0.015, c.bed], [147, 0.04, c.bed], [196.2, 0.09, high], [293.7, 0.05, high], [392.4, 0.03, high]].forEach(([f, a, out], i) => {
           const g = gain(a);
           osc(c, 'sine', f).connect(g).connect(out);
           lfo(c, 0.035 + i * 0.021, a * 0.15, g.gain); // slow shimmer only, so the breath leads
