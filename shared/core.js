@@ -203,6 +203,16 @@
       param.linearRampToValueAtTime(v, t + sec);
       curves.set(param, (x) => (x >= t + sec ? v : v0 + (v - v0) * Math.max(0, x - t) / sec));
     }
+    // Fade to silence on an eased curve: it leaves the top slowly and thins out to nothing,
+    // so the ear hears an even fade (a straight ramp seems to hold, then drop at the end).
+    function fadeOut(param, sec) {
+      const t = ctx.currentTime, v0 = hold(param, t);
+      const shape = (k) => v0 * ((1 + Math.cos(Math.PI * Math.min(1, Math.max(0, k)))) / 2) ** 2;
+      const pts = new Float32Array(64).map((_, i) => shape(i / 63));
+      // Starts a hair after the held value, as some browsers refuse a curve that shares its start.
+      param.setValueCurveAtTime(pts, t + 0.01, sec);
+      curves.set(param, (x) => shape((x - t - 0.01) / sec));
+    }
 
     function impulse(sec, decay) {
       const len = Math.floor(ctx.sampleRate * sec), b = ctx.createBuffer(2, len, ctx.sampleRate);
@@ -663,7 +673,7 @@
       const c = cur; cur = null;
       c.stopped = true;
       c.chains.forEach((ch) => clearTimeout(ch.id));
-      to(c.bed.gain, 0, fade);
+      fadeOut(c.bed.gain, fade);
       setTimeout(() => {
         c.sources.forEach((s) => { try { s.stop(); } catch { /* already stopped */ } });
         try { c.bed.disconnect(); } catch { /* ignore */ }
@@ -1152,7 +1162,7 @@
       audio.dim(false);
       // Sleep ends without the three bells or the buzz; its sound just fades away slowly.
       const sleep = mode === 'sleep';
-      audio.stopAmbience(early ? 2 : sleep ? 20 : 4);
+      audio.stopAmbience(early ? 3 : sleep ? 20 : 12);
       const f0 = cfg.bell?.f0 ?? 196, vol = cfg.bell?.vol ?? 0.5;
       if (early) audio.bell(0.2, vol * 0.7, f0);
       else if (!sleep) {
