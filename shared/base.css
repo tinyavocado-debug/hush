@@ -216,7 +216,7 @@ main:is([data-mode="steady"], [data-mode="breath"]) .mode-pick { display: flex; 
 .breath-open-word { font: italic 300 17px/1 var(--serif); letter-spacing: 0.03em; white-space: nowrap; }
 main.show-controls .breath-open { opacity: 1; pointer-events: auto; transform: none; }
 /* On the setup screen the mode row does its job; Sleep has nothing to change mid-session. */
-main[data-state="setup"] .breath-open, main[data-mode="sleep"] .breath-open { display: none; }
+main[data-state="setup"] .breath-open, main:is([data-mode="sleep"], [data-mode="steady"]) .breath-open { display: none; }
 .breath-open:active { transform: scale(0.97); }
 main.show-controls .hint { opacity: 0; } /* the tap hint shares the top of the screen */
 
@@ -265,6 +265,21 @@ main.show-controls .hint { opacity: 0; } /* the tap hint shares the top of the s
 .hold-toggle { height: 44px; border: 1px solid var(--line); }
 .paces button[aria-checked="true"], .hold-toggle[aria-pressed="true"] { background: var(--chip-on); color: var(--ink); }
 .hold-toggle[aria-pressed="true"] { border-color: var(--ink-faint); }
+/* Steady's pace row during a session, just above the controls and shown with them. */
+.session-pace {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--safe-b) + 136px);
+  width: min(340px, calc(100% - 40px));
+  transform: translate(-50%, 10px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+main[data-mode="steady"] .session-pace { display: block; }
+main.show-controls .session-pace { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.session-pace .paces, .session-pace .hold-toggle { background-color: rgba(0, 0, 0, 0.25); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 .bmenu-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

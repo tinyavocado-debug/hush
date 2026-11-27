@@ -776,10 +776,11 @@
 
     // The session's mode, picked on the setup screen:
     //   Sleep: breathes at the Long pace, and ends with no bells and no vibration.
-    //   Steady: your own pace (Short / Steady / Long, and Hold), chosen right below.
+    //   Steady: your own pace (Short / Steady / Long, and Hold). Picking it sets Steady + Hold;
+    //   during a session the pace row sits above the controls, so it can change mid-breath.
     //   Breath: a breathing technique, chosen from the breath menu, which pops up.
-    // During a session the button at the top right (with the controls) opens the menu for the
-    // mode's own choices; a change mid-session starts with the next breath.
+    // During a Breath session the button at the top right (with the controls) opens the menu;
+    // a change mid-session starts with the next breath.
     // Holding a technique draws an outline round it and makes it a favorite, which moves it to
     // the top; holding a favorite again unwinds the outline.
     const MODES = { sleep: 'Sleep', steady: 'Steady', breath: 'Breath' };
@@ -849,13 +850,20 @@
         <button type="button" class="ghost bmenu-done">Done</button>
       </div>`;
     document.body.appendChild(menu);
+    // Steady's pace row in the session, shown with the controls.
+    const sessionPace = document.createElement('div');
+    sessionPace.className = 'session-pace';
+    sessionPace.innerHTML = paceRow;
+    $('.session').appendChild(sessionPace);
+    const paceBoxes = [menu, sessionPace];
+    const paceAll = (sel) => paceBoxes.flatMap((x) => [...x.querySelectorAll(sel)]);
     const grid = menu.querySelector('.bmenu-grid');
     const techBtn = Object.fromEntries([...grid.children].map((b) => [b.dataset.tech, b]));
-    menu.querySelectorAll('[data-pace]').forEach((b) => b.addEventListener('click', () => {
+    paceAll('[data-pace]').forEach((b) => b.addEventListener('click', () => {
       setBreath(b.dataset.pace, lastHold);
       audio.ensure(); audio.tick(1.2);
     }));
-    menu.querySelectorAll('.hold-toggle').forEach((b) => b.addEventListener('click', () => {
+    paceAll('.hold-toggle').forEach((b) => b.addEventListener('click', () => {
       setBreath(lastPace, !lastHold);
       audio.ensure(); audio.tick(1.2);
     }));
@@ -863,9 +871,10 @@
       const again = m === mode;
       mode = m;
       prefs.set('mode', m);
+      if (m === 'steady') { lastPace = 'steady'; lastHold = true; } // Steady starts as Steady + Hold
       setBreath(...modePattern());
       audio.ensure(); audio.tick(1.3);
-      if (m !== 'sleep' && !again) openMenu();
+      if (m === 'breath' && !again) openMenu();
     }
     modeBox.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => chooseMode(b.dataset.mode)));
     const MODE_KEYS = Object.keys(MODES);
@@ -977,8 +986,8 @@
       const P = Spa.pattern, T = Spa.technique(P.id);
       opener.querySelector('.breath-open-word').textContent = T ? T.word : `${Spa.PACES[P.pace].label}${P.hold ? ' · Hold' : ''}`;
       opener.setAttribute('aria-label', `Breath: ${opener.textContent}`);
-      menu.querySelectorAll('[data-pace]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.pace === P.pace)));
-      menu.querySelectorAll('.hold-toggle').forEach((b) => b.setAttribute('aria-pressed', String(!!P.pace && P.hold)));
+      paceAll('[data-pace]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.pace === P.pace)));
+      paceAll('.hold-toggle').forEach((b) => b.setAttribute('aria-pressed', String(!!P.pace && P.hold)));
       modeBox.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mode === mode)));
       const pick = mode === 'breath' ? Spa.technique(lastTech).word : `${Spa.PACES[lastPace].label}${lastHold ? ' · Hold' : ''}`;
       modeBox.querySelector('.mode-pick span').textContent = pick;
