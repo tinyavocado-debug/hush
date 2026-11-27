@@ -557,12 +557,12 @@ main.muted .ctrl .i-off { display: block; }
   -webkit-backdrop-filter: blur(16px) saturate(1.2); backdrop-filter: blur(16px) saturate(1.2);
 }
 /* It fades in and out (it used to unfold from the capsule). */
-.prog-sheet.look-hairline { transition: opacity 0.5s ease, visibility 0s linear 0.5s; }
+.prog-sheet.look-hairline { transition: opacity 0.5s ease, visibility 0s linear 0.5s; grid-template: minmax(0, 1fr) / minmax(0, 1fr); } /* the column is the screen's height, never its content's */
 .prog-sheet.look-hairline.open { transition: opacity 0.5s ease, visibility 0s; }
 .look-hairline .sh-in { justify-content: center; gap: 4px; padding: calc(env(safe-area-inset-top, 0px) + 22px) 12px calc(env(safe-area-inset-bottom, 0px) + 18px); box-sizing: border-box; }
-/* The trail takes the height it needs, and Begin sits just under it. */
-.look-hairline .prog-sky { flex: 0 1 auto; min-height: 0; height: min(620px, calc(100vh - 190px)); width: auto; max-width: 100%; aspect-ratio: 360 / 630; overflow: visible; }
-@supports (height: 1dvh) { .look-hairline .prog-sky { height: min(620px, calc(100dvh - 190px)); } }
+/* The trail takes up to 620px and gives way to whatever the title, Begin and sounds need,
+   so they always fit on a short phone (the drawing scales down inside it). */
+.look-hairline .prog-sky { flex: 0 1 620px; min-height: 0; height: auto; width: 100%; max-width: 100%; overflow: visible; }
 .sh-sounds { margin-top: 4px; width: min(100%, 340px); }
 .climb-path { fill: none; stroke: color-mix(in srgb, var(--ink) 70%, transparent); stroke-width: 1.2; }
 .climb-path.dim { stroke: color-mix(in srgb, var(--ink) 34%, transparent); stroke-width: 1; stroke-dasharray: 2 4; }
