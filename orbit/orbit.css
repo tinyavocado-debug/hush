@@ -6,11 +6,11 @@
   --accent-2: #bfb096;
   --accent-ink: #030209;
   --glow: rgba(242, 197, 138, 0.3);
-  --dial: min(78vw, 38vh, 340px);
+  --dial: min(72vw, 38vh, 340px);
 }
-@supports (height: 1dvh) { :root { --dial: min(78vw, 38dvh, 340px); } }
+@supports (height: 1dvh) { :root { --dial: min(72vw, 38dvh, 340px); } }
 /* Short phones: room for the program's stars at the top. */
-@media (max-height: 760px) { :root { --dial: min(78vw, 29vh, 340px); } .dial-hint { display: none; } .setup { gap: 10px; } }
+@media (max-height: 760px) { :root { --dial: min(72vw, 29vh, 340px); } .dial-hint { display: none; } .setup { gap: 10px; } }
 
 body {
   background: radial-gradient(80% 46% at 50% 42%, #3d22a8 0%, #1a0f58 34%, #07051a 62%, #020106 85%);
@@ -88,7 +88,8 @@ body[data-phase="session"] .dusk { opacity: 0.38; }
 
 .pebble-btn {
   position: absolute;
-  bottom: 0;
+  top: 50%;
+  margin-top: -22px;
   width: 48px; height: 44px;
   border-radius: 52% 48% 46% 54% / 58% 56% 44% 42%;
   background: radial-gradient(circle at 36% 30%, rgba(246, 239, 228, 0.22), rgba(183, 168, 143, 0.08) 70%);
@@ -96,8 +97,9 @@ body[data-phase="session"] .dusk { opacity: 0.38; }
   font: 300 26px/1 var(--serif);
   color: var(--ink-soft);
 }
-.pebble-btn.minus { left: -2px; }
-.pebble-btn.plus { right: -2px; }
+/* Either side of the dial, halfway up (moved from the bottom corners 2026-11-27). */
+.pebble-btn.minus { left: -36px; }
+.pebble-btn.plus { right: -36px; }
 .pebble-btn:active { transform: scale(0.92); }
 
 .dial-hint {

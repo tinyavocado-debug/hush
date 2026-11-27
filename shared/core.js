@@ -601,19 +601,19 @@
       hearth(c) {
         // Breathes like bellows: roar and rumble rise on the in-breath, and the crackles with them.
         const rumble = filt('lowpass', 260);
-        src(c, buf('brown'), 0.8).connect(rumble).connect(gain(0.6)).connect(c.bed);
-        const roar = gain(0.05);
+        src(c, buf('brown'), 0.8).connect(rumble).connect(gain(0.48)).connect(c.bed);
+        const roar = gain(0.04); // roar and rumble 0.8x, a little quieter (2026-11-27)
         src(c, buf('white')).connect(filt('bandpass', 900, 0.5)).connect(roar).connect(c.bed);
-        lfo(c, 0.13, 0.006, roar.gain); // a faint flicker, small next to the breath
+        lfo(c, 0.13, 0.005, roar.gain); // a faint flicker, small next to the breath
         c.breathe = (p) => {
-          breathShape(roar.gain, p, 0.11, 0.035);
+          breathShape(roar.gain, p, 0.088, 0.028);
           breathShape(rumble.frequency, p, 560, 240, true);
         };
-        chain(c, () => (25 + Math.random() ** 2 * 520) / (0.5 + 10 * now(roar.gain)), () => {
+        chain(c, () => (25 + Math.random() ** 2 * 520) / (0.5 + 12.5 * now(roar.gain)), () => {
           const t = ctx.currentTime + 0.005, s = ctx.createBufferSource();
           const big = Math.random() < 0.06, peak = big ? 0.3 + Math.random() * 0.2 : 0.02 + Math.random() ** 3 * 0.18;
           s.buffer = buf('click'); s.playbackRate.value = 0.6 + Math.random() * 1.2;
-          const g = gain(peak), p = panner(Math.random() * 1.4 - 0.7);
+          const g = gain(peak * 1.6), p = panner(Math.random() * 1.4 - 0.7); // crackles a little louder (2026-11-27)
           s.connect(filt('highpass', big ? 700 : 1200 + Math.random() * 2800)).connect(g).connect(p).connect(c.bed);
           s.start(t);
           emit('crackle', { peak, big });
@@ -792,8 +792,6 @@
     let mode = MODES[saved] ? saved : (saved === 'program' || saved === 'breath') && PROG ? 'program' : 'steady';
     const progPattern = () => { const S = PROG.star(); return [S.id, false, S.counts]; };
     const modePattern = (m = mode) => (m === 'sleep' ? ['long', false] : m === 'program' ? progPattern() : [lastPace, lastHold]);
-    // A mode's pattern, without choosing it.
-    const patternFor = (m) => { const keep = Spa.pattern; Spa.setPattern(...modePattern(m)); const P = Spa.pattern; Spa.pattern = keep; return P; };
     Spa.setPattern(...modePattern());
 
     const paceRow = `
@@ -804,13 +802,14 @@
         <button type="button" class="hold-toggle" aria-pressed="false">Hold</button>
       </div>`;
 
-    // On the setup screen, above the sounds: the three modes as orbs, each breathing at its own
-    // mode's rhythm, and below them the mode's choice (Steady and Breath reopen their pop-up).
+    // On the setup screen, above the sounds: Sleep / Steady as one thin pill split in two (Toggle,
+    // chosen 2026-11-27 over the orbs, Words and Dots), and below it the mode's choice
+    // (Steady's pace reopens the breath menu).
     const modeBox = document.createElement('div');
     modeBox.className = 'mode';
     modeBox.innerHTML = `
-      <div class="modes-orbs" role="radiogroup" aria-label="Session">
-        ${Object.entries(MODES).map(([k, v]) => `<button type="button" role="radio" data-mode="${k}"><span class="mo-orb"><i></i></span><span class="mo-word">${v}</span></button>`).join('')}
+      <div class="modes" role="radiogroup" aria-label="Session">
+        ${Object.entries(MODES).map(([k, v]) => `<button type="button" role="radio" data-mode="${k}">${v}</button>`).join('')}
       </div>
       <div class="mode-more">
         <button type="button" class="mode-pick" aria-haspopup="dialog"><span></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
@@ -887,16 +886,6 @@
       audio.ensure(); audio.tick(1.3);
     });
     modeBox.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => chooseMode(b.dataset.mode)));
-    const MODE_KEYS = Object.keys(MODES);
-
-    // Orbs: each orb swells and settles with its own mode's breath.
-    let orbPat = {};
-    const orbBtns = [...modeBox.querySelectorAll('.modes-orbs [data-mode]')];
-    (function orbLoop(now) {
-      requestAnimationFrame(orbLoop);
-      if (st.phase !== 'setup') return;
-      orbBtns.forEach((b) => b.style.setProperty('--k', Spa.breathAt(now, orbPat[b.dataset.mode]).k.toFixed(3)));
-    })(performance.now());
 
     modeBox.querySelector('.mode-pick').addEventListener('click', openMenu);
 
@@ -1005,7 +994,6 @@
       prog?.render(mode === 'program');
       if (mode === 'program') modeBox.querySelector('.mode-prog').textContent = Spa.patternCounts(P);
       main.dataset.mode = menu.dataset.mode = mode;
-      orbPat = Object.fromEntries(MODE_KEYS.map((m) => [m, patternFor(m)]));
       Object.values(techBtn).forEach((b) => b.setAttribute('aria-checked', String(b.dataset.tech === P.id)));
       menu.querySelector('.bmenu-name').textContent = T ? (T.sub ? `${T.name} — ${T.sub}` : T.name) : `Your own pace — ${Spa.PACES[P.pace].label}`;
       menu.querySelector('.bmenu-counts').textContent = Spa.patternCounts(P);

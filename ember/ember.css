@@ -10,6 +10,13 @@
   --accent-2: #c8763f;
   --accent-ink: #2a140b;
   --glow: rgba(232, 140, 70, 0.4);
+  /* The program sheet: a warm ember dusk. */
+  --dusk-low: rgba(96, 50, 30, 0.985);
+  --dusk-mid: rgba(50, 27, 19, 0.98);
+  --dusk-top: rgba(22, 13, 10, 0.985);
+  --mw: #e9b48a;
+  --mw-mid: #f2d2b4;
+  --dust: #f0dcc6;
 }
 
 body {
@@ -76,7 +83,8 @@ body {
 }
 .step {
   position: absolute;
-  bottom: 6px;
+  top: 50%;
+  margin-top: -23px;
   width: 46px; height: 46px;
   border-radius: 50%;
   border: 1px solid var(--line);
