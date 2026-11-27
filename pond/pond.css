@@ -10,6 +10,13 @@
   --accent-2: #b9c8b2;
   --accent-ink: #10302b;
   --glow: rgba(180, 220, 190, 0.25);
+  /* The program sheet: a deep green-teal dusk, like the water. */
+  --dusk-low: rgba(34, 86, 76, 0.985);
+  --dusk-mid: rgba(17, 50, 45, 0.98);
+  --dusk-top: rgba(7, 24, 22, 0.985);
+  --mw: #9fdcc6;
+  --mw-mid: #c8eedd;
+  --dust: #d2efe2;
 }
 body {
   background: radial-gradient(90% 70% at 50% 45%, #1d4a42 0%, #0a1f1d 85%);
@@ -17,7 +24,8 @@ body {
 }
 
 /* ───────── setup ───────── */
-.setup { justify-content: space-between; gap: 12px; padding-top: calc(var(--safe-t) + 36px); }
+@media (max-height: 760px) { .stage { min-height: 140px; } }
+.setup { justify-content: space-between; gap: 12px; padding-top: calc(var(--safe-t) + 20px); }
 .stage {
   position: relative;
   flex: 1 1 auto;
@@ -49,7 +57,8 @@ body {
 }
 .step {
   position: absolute;
-  bottom: 4px;
+  top: 50%;
+  margin-top: -22px;
   width: 44px; height: 44px;
   border-radius: 50%;
   border: 1px solid var(--line);

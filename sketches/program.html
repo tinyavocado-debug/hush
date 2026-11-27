@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hush · program sketches</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #eadfcb; --soft: rgba(234,223,203,.72); --faint: rgba(234,223,203,.42); --line: rgba(234,223,203,.16);
+    --serif: 'Cormorant Garamond', Georgia, serif; --sans: 'Jost', system-ui, sans-serif;
+    --bg: #080b14;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 300 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+  .wrap { max-width: 440px; margin: 0 auto; padding: 18px 20px 140px; }
+
+  /* sketch switcher */
+  .switch { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; justify-content: center; padding: 12px 0; background: linear-gradient(var(--bg) 70%, transparent); }
+  .switch button { padding: 7px 14px; border: 1px solid var(--line); border-radius: 99px; font-size: 13px; color: var(--soft); }
+  .switch button.on { background: rgba(234,223,203,.12); color: var(--ink); border-color: rgba(234,223,203,.35); }
+  .eyebrow { margin: 18px 0 4px; font-size: 11px; letter-spacing: .38em; text-transform: uppercase; color: var(--faint); text-align: center; }
+  h1 { margin: 0; text-align: center; font: italic 300 36px/1.1 var(--serif); }
+  .lede { margin: 8px auto 18px; max-width: 34ch; text-align: center; color: var(--faint); font-size: 14px; text-wrap: balance; }
+
+  /* the card under each view: what's next */
+  .next { margin: 18px 0 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.025); text-align: center; }
+  .next .k { font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: var(--faint); }
+  .next .w { margin: 4px 0 0; font: 300 34px/1.05 var(--serif); }
+  .next .n { color: var(--soft); font-size: 13px; }
+  .next .c { margin-top: 6px; font-size: 14px; }
+  .next .why { margin: 10px auto 0; max-width: 32ch; color: var(--faint); font-size: 13px; }
+
+  .dock { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 10px; justify-content: center; padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, var(--bg) 35%); }
+  .dock button { padding: 12px 20px; border-radius: 99px; font-size: 14px; }
+  .dock .go { background: var(--ink); color: #10121a; font-weight: 400; }
+  .dock .reset { border: 1px solid var(--line); color: var(--faint); }
+  .tag { display: inline-block; margin-top: 8px; font-size: 11px; color: var(--faint); border: 1px dashed var(--line); padding: 2px 8px; border-radius: 99px; }
+
+  .view { display: none; } .view.on { display: block; }
+
+  /* 1 · Constellations */
+  #sky, #feelsky { width: 100%; height: auto; display: block; border-radius: 22px;
+    background: radial-gradient(120% 70% at 50% 100%, #1a1438 0%, #0b0d1c 55%, #06070d 100%); }
+  .lvl { font: italic 300 15px var(--serif); fill: var(--faint); letter-spacing: .04em; }
+  .star { cursor: pointer; }
+  .star .halo { fill: #cdb8ff; opacity: 0; }
+  .star.lit .halo { opacity: .22; }
+  .star.now .halo { opacity: .35; animation: breathe 6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  @keyframes breathe { 0%,100% { transform: scale(.7); opacity: .18; } 50% { transform: scale(1.25); opacity: .45; } }
+  .star .core { fill: rgba(234,223,203,.18); }
+  .star.lit .core, .star.now .core { fill: #fff6e6; }
+  .star .lab { font-size: 10.5px; fill: var(--faint); letter-spacing: .06em; }
+  .star.lit .lab, .star.now .lab { fill: var(--soft); }
+  .star.sel .lab { fill: var(--ink); font-weight: 400; }
+  .star.eased .halo { fill: #9fc7ff; }
+  .delta { color: var(--faint); font-size: 12px; }
+  .pip { fill: none; stroke: rgba(234,223,203,.25); stroke-width: 1; }
+  .pip.done { fill: #fff6e6; stroke: none; }
+  .link { stroke: rgba(205,184,255,.5); stroke-width: 1; fill: none; }
+  .link.dim { stroke: rgba(234,223,203,.07); stroke-dasharray: 2 4; }
+
+  /* 2 · Moon */
+  .moons { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px 6px; margin-top: 4px; }
+  .night { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; color: var(--faint); }
+  .night svg { width: 36px; height: 36px; }
+  .night.done { color: var(--soft); }
+  .night.today { color: var(--ink); }
+  .night.today svg { filter: drop-shadow(0 0 8px rgba(255,236,200,.55)); }
+  .night .t { font-size: 9.5px; letter-spacing: .02em; text-align: center; line-height: 1.15; min-height: 2.3em; }
+  .weeks { display: grid; grid-template-columns: repeat(4,1fr); margin: 14px 0 6px; font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--faint); text-align: center; }
+  .bigmoon { display: block; margin: 0 auto 6px; width: 120px; height: 120px; filter: drop-shadow(0 0 24px rgba(255,236,200,.25)); }
+
+  /* 3 · Lotus */
+  #lotus { width: 100%; height: auto; display: block; border-radius: 22px;
+    background: radial-gradient(80% 60% at 50% 50%, #0e2b2a 0%, #081a1a 60%, #050d0d 100%); }
+  .petal { stroke: rgba(234,223,203,.22); stroke-width: 1; fill: rgba(234,223,203,.025); transition: fill 1.2s, stroke 1.2s; }
+  .petal.open { fill: url(#pg); stroke: rgba(255,214,224,.6); }
+  .petal.now { stroke: #ffe3ea; stroke-width: 1.5; animation: pnow 6s ease-in-out infinite; }
+  @keyframes pnow { 0%,100% { stroke-opacity: .35; } 50% { stroke-opacity: 1; } }
+  .ask { display: none; margin-top: 14px; text-align: center; }
+  .ask.on { display: block; }
+  .ask p { margin: 0 0 10px; font: italic 300 22px var(--serif); }
+  .ask .row { display: flex; gap: 8px; justify-content: center; }
+  .ask button { padding: 10px 16px; border: 1px solid var(--line); border-radius: 99px; font-size: 14px; }
+  .ask button:hover { border-color: rgba(234,223,203,.45); }
+  .log { margin: 14px 0 0; padding: 0; list-style: none; font-size: 12.5px; color: var(--faint); text-align: center; }
+  .log li { margin: 2px 0; }
+</style>
+</head>
+<body>
+<nav class="switch">
+  <button data-v="feel" class="on">Sky + feel</button>
+  <button data-v="sky">1 · Constellations</button>
+  <button data-v="moon">2 · Moon</button>
+  <button data-v="lotus">3 · Lotus</button>
+</nav>
+
+<main class="wrap">
+  <!-- 0 -->
+  <section class="view on" id="v-feel">
+    <p class="eyebrow">At your own pace, and it listens</p>
+    <h1>Constellations</h1>
+    <p class="lede">After each session you say how it felt. Every session fills a dot, and three light the star. Easy lights it sooner. About right adds a minute. Hard makes the next one easier.</p>
+    <svg id="feelsky" viewBox="0 0 360 620"></svg>
+    <div class="ask" id="feel-ask">
+      <p>How was that?</p>
+      <div class="row"><button data-f="easy">Easy</button><button data-f="right">About right</button><button data-f="hard">Hard</button></div>
+    </div>
+    <div class="next" id="feel-next"></div>
+    <ul class="log" id="feel-log"></ul>
+  </section>
+
+  <!-- 1 -->
+  <section class="view" id="v-sky">
+    <p class="eyebrow">At your own pace</p>
+    <h1>Constellations</h1>
+    <p class="lede">Twelve stars, climbing from the beginner sky at the bottom to the expert sky at the top. Three sessions light a star and open the next one.</p>
+    <svg id="sky" viewBox="0 0 360 620"></svg>
+    <div class="next" id="sky-next"></div>
+  </section>
+
+  <!-- 2 -->
+  <section class="view" id="v-moon">
+    <p class="eyebrow">A 28-night course</p>
+    <h1>Moon</h1>
+    <p class="lede">One set session a night, from new moon to full. Sessions start short and grow, with new breaths brought in on set nights. Miss a night and the moon waits.</p>
+    <svg class="bigmoon" id="bigmoon" viewBox="-50 -50 100 100"></svg>
+    <div class="weeks"><span>Beginner</span><span>Beginner+</span><span>Intermediate</span><span>Expert</span></div>
+    <div class="moons" id="moons"></div>
+    <div class="next" id="moon-next"></div>
+  </section>
+
+  <!-- 3 -->
+  <section class="view" id="v-lotus">
+    <p class="eyebrow">It listens</p>
+    <h1>Lotus</h1>
+    <p class="lede">After each session you say how it felt. Easy opens the next petal. About right keeps you here a little longer. Hard eases the counts.</p>
+    <svg id="lotus" viewBox="-180 -180 360 360"></svg>
+    <div class="ask" id="ask">
+      <p>How was that?</p>
+      <div class="row"><button data-f="easy">Easy</button><button data-f="right">About right</button><button data-f="hard">Hard</button></div>
+    </div>
+    <div class="next" id="lotus-next"></div>
+    <ul class="log" id="lotus-log"></ul>
+  </section>
+</main>
+
+<div class="dock">
+  <button class="reset" id="reset">Start over</button>
+  <button class="go" id="go">Finish a session</button>
+</div>
+
+<script src="../shared/core.js"></script>
+<script>
+const T = Object.fromEntries(Spa.TECHNIQUES.map((x) => [x.id, x]));
+const counts = (t, parts) => {
+  const [i, h1, o, h2] = t, out = [];
+  if (parts) parts.forEach((p) => out.push(`${+(i / parts.length).toFixed(1)} ${p}`)); else out.push(`${i} in`);
+  if (h1) out.push(`${h1} hold`); out.push(`${o} out`); if (h2) out.push(`${h2} hold`);
+  return out.join(' · ');
+};
+const say = (id, t) => { const x = T[id]; const s = counts(t || x.t, x.parts); return x.say?.out === 'hum' ? s.replace('out', 'hum') : x.id === 'activating' ? s : s; };
+
+// The ladder, easiest first. Minutes are placeholders to tune.
+const LADDER = [
+  { id: 'balance', lvl: 0, min: 3, why: 'Even in, even out. The base everything else builds on.' },
+  { id: 'alertness', lvl: 0, min: 3, why: 'Same rhythm, a longer breath in.' },
+  { id: 'recovery', lvl: 0, min: 4, why: 'Now the breath out grows to twice the breath in.' },
+  { id: 'body', lvl: 0, min: 4, why: 'One breath in, filled in three parts.' },
+  { id: 'movement', lvl: 1, min: 5, why: 'Adds a skill: the ocean sound in the throat.' },
+  { id: 'senses', lvl: 1, min: 5, why: 'A long hum on the breath out.' },
+  { id: 'concentration', lvl: 1, min: 5, why: 'The first hold, a short one after breathing in.' },
+  { id: 'stillness', lvl: 1, min: 6, why: 'The hold moves to after the breath out, which is harder.' },
+  { id: 'control', lvl: 2, min: 6, why: 'A hold in, then a long breath out.' },
+  { id: 'discipline', lvl: 2, min: 8, why: 'Box breathing. Four equal sides, two holds.' },
+  { id: 'activating', lvl: 2, min: 2, why: 'Fast bellows breaths. Short rounds, stop if dizzy.' },
+  { id: 'advanced', lvl: 2, min: 10, why: 'The long 1 : 4 : 2 hold. The top of the ladder.' },
+];
+const LVL = ['Beginner', 'Intermediate', 'Expert'];
+
+/* ───────── 1 · Constellations ───────── */
+const NEED = 3;
+const POS = [ // bottom (beginner) to top (expert)
+  [70, 560], [140, 520], [230, 548], [292, 492],
+  [250, 400], [160, 372], [82, 330], [130, 262],
+  [228, 228], [296, 160], [210, 100], [118, 56],
+];
+let sky = { done: Array(12).fill(0), sel: 0 };
+const skyNow = () => sky.done.findIndex((d) => d < NEED);
+// Draws the sky. st: { done[], sel }, isLit(i), eased(i) optional, onSel(i).
+function paintSky(svg, st, isLit, onSel, eased = () => false) {
+  const now = LADDER.findIndex((_, i) => !isLit(i));
+  let s = '';
+  // background specks
+  for (let i = 0; i < 70; i++) { const x = (i * 97) % 360, y = (i * 211) % 620; s += `<circle cx="${x}" cy="${y}" r="${(i % 3) * .3 + .3}" fill="#fff" opacity="${.08 + (i % 5) * .04}"/>`; }
+  s += `<text class="lvl" x="16" y="604">Beginner</text><text class="lvl" x="16" y="440">Intermediate</text><text class="lvl" x="16" y="196">Expert</text>`;
+  for (let i = 0; i < 11; i++) {
+    const [a, b] = [POS[i], POS[i + 1]];
+    s += `<line class="link ${isLit(i) ? '' : 'dim'}" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/>`;
+  }
+  LADDER.forEach((L, i) => {
+    const [x, y] = POS[i], lit = isLit(i), isNow = i === now;
+    const cls = `star ${lit ? 'lit' : ''} ${isNow ? 'now' : ''} ${i === st.sel ? 'sel' : ''} ${eased(i) ? 'eased' : ''}`;
+    let pips = '';
+    for (let k = 0; k < NEED; k++) pips += `<circle class="pip ${lit || k < st.done[i] ? 'done' : ''}" cx="${x - 8 + k * 8}" cy="${y + 14}" r="2"/>`;
+    s += `<g class="${cls}" data-i="${i}"><circle class="halo" cx="${x}" cy="${y}" r="16"/><circle class="core" cx="${x}" cy="${y}" r="${lit || isNow ? 3.4 : 2.2}"/>
+      ${lit || isNow ? pips : ''}<text class="lab" x="${x}" y="${y - 12}" text-anchor="middle">${T[L.id].word}</text>
+      <circle cx="${x}" cy="${y}" r="20" fill="transparent"/></g>`;
+  });
+  svg.innerHTML = s;
+  svg.querySelectorAll('.star').forEach((g) => g.addEventListener('click', () => onSel(+g.dataset.i)));
+  return now;
+}
+function drawSky() {
+  const now = paintSky(document.getElementById('sky'), sky, (i) => sky.done[i] >= NEED, (i) => { sky.sel = i; drawSky(); });
+  const i = sky.sel, L = LADDER[i], open = i <= now || now < 0;
+  document.getElementById('sky-next').innerHTML = `
+    <div class="k">${LVL[L.lvl]} · star ${i + 1} of 12</div>
+    <div class="w">${T[L.id].word}</div><div class="n">${T[L.id].name}${T[L.id].sub ? ' · ' + T[L.id].sub : ''}</div>
+    <div class="c">${say(L.id)} &nbsp;·&nbsp; ${L.min} min</div>
+    <p class="why">${open ? L.why : 'Still dark. Light the stars before it to reach it.'}</p>
+    <span class="tag">${sky.done[i] >= NEED ? 'Lit. Come back to it any time.' : open ? `${sky.done[i]} of ${NEED} sessions` : 'Locked'}</span>`;
+}
+function skyFinish() {
+  const now = skyNow(); if (now < 0) return;
+  const i = sky.sel <= now ? sky.sel : now;
+  sky.done[i]++;
+  if (sky.done[i] >= NEED && i === now && now < 11) sky.sel = now + 1;
+  drawSky();
+}
+
+/* ───────── 0 · Constellations + "How was that?" ───────── */
+// Easy: the star lights now and the next one opens (expert stars need 2 sessions first).
+// About right: a session counts and the next one is a minute longer. 3 sessions light it.
+// Hard: still counts. Holds halved and a minute shorter until it feels easy; a star lit while eased opens the next one eased.
+const EXPERT_MIN = 2, MAX_EXTRA = 4;
+const easeT = (x) => x.t.map((v, j) => (j === 1 || j === 3) ? Math.ceil(v / 2) : j === 2 && v > x.t[0] ? Math.max(x.t[0], v - 2) : j === 0 && v > x.t[2] ? Math.max(x.t[2], v - 2) : v);
+let feel, feelAsk = false;
+function feelReset() {
+  feel = { done: Array(12).fill(0), lit: Array(12).fill(false), min: LADDER.map((L) => L.min), eased: Array(12).fill(false), note: Array(12).fill(''), sel: 0, log: [] };
+  feelAsk = false;
+}
+function drawFeel() {
+  const now = paintSky(document.getElementById('feelsky'), feel, (i) => feel.lit[i], (i) => { if (!feelAsk) { feel.sel = i; drawFeel(); } }, (i) => feel.eased[i]);
+  document.getElementById('feel-ask').classList.toggle('on', feelAsk);
+  const i = feel.sel, L = LADDER[i], x = T[L.id], open = i <= now || now < 0;
+  const t = feel.eased[i] ? easeT(x) : x.t;
+  const delta = feel.min[i] - L.min;
+  document.getElementById('feel-next').innerHTML = `
+    <div class="k">${LVL[L.lvl]} · star ${i + 1} of 12</div>
+    <div class="w">${x.word}</div><div class="n">${x.name}${x.sub ? ' · ' + x.sub : ''}</div>
+    <div class="c">${say(L.id, t)} &nbsp;·&nbsp; ${feel.min[i]} min${delta ? ` <span class="delta">(${delta > 0 ? '+' : ''}${delta})</span>` : ''}</div>
+    <p class="why">${!open ? 'Still dark. Light the stars before it to reach it.' : feel.note[i] || L.why}</p>
+    <span class="tag">${feel.lit[i] ? 'Lit. Come back to it any time.' : open ? `${feel.done[i]} of ${NEED} sessions${feel.eased[i] ? ' · eased' : ''}` : 'Locked'}</span>`;
+  document.getElementById('feel-log').innerHTML = feel.log.slice(-5).reverse().map((x) => `<li>${x}</li>`).join('');
+}
+function feelFinish() {
+  const now = feel.lit.indexOf(false);
+  if (now < 0 || feelAsk) return;
+  if (feel.sel > now) feel.sel = now;
+  feelAsk = true; drawFeel();
+  document.getElementById('feel-ask').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function feelAnswer(f) {
+  const i = feel.sel, L = LADDER[i], w = T[L.id].word, wasLit = feel.lit[i];
+  feelAsk = false;
+  feel.done[i]++; // every session counts, whatever the answer
+  const light = () => {
+    feel.lit[i] = true;
+    const nx = feel.lit.indexOf(false);
+    if (nx < 0) { feel.log.push(`${w} is lit. The whole sky is lit.`); return; }
+    feel.sel = nx;
+    const nw = T[LADDER[nx].id].word;
+    if (feel.eased[i] && !feel.done[nx]) { // carry the easier start to the next star
+      feel.eased[nx] = true; feel.min[nx] = Math.max(2, LADDER[nx].min - 1);
+      feel.note[nx] = `Starts eased, since ${w} felt hard. Say Easy to go to full counts.`;
+      feel.log.push(`${w} is lit. ${nw} opens, eased to start.`);
+    } else feel.log.push(`${w} is lit. ${nw} opens.`);
+  };
+  if (f === 'hard') {
+    feel.min[i] = Math.max(2, feel.min[i] - 1);
+    feel.eased[i] = true;
+    feel.note[i] = 'Counted. The next one is eased: shorter holds, a shorter breath out and a minute less.';
+    feel.log.push(`${w} felt hard: counted, and the next one is eased.`);
+  } else if (f === 'easy' && feel.eased[i]) {
+    feel.eased[i] = false; feel.min[i] = Math.max(feel.min[i], L.min);
+    feel.note[i] = 'Back to full counts and the usual length.';
+    feel.log.push(`${w} felt easy: back to full counts and the usual length.`);
+  } else if (f === 'easy') {
+    if (wasLit) { feel.min[i] = Math.min(L.min + MAX_EXTRA, feel.min[i] + 1); feel.log.push(`${w} felt easy: a minute longer next time.`); }
+    else if (L.lvl === 2 && feel.done[i] < EXPERT_MIN) { feel.note[i] = 'Expert stars need two sessions. Once more and an easy one lights it.'; feel.log.push(`${w} felt easy: one more before this expert star lights.`); }
+    else { light(); drawFeel(); return; }
+  } else { // about right
+    feel.min[i] = Math.min(L.min + MAX_EXTRA, feel.min[i] + 1);
+    feel.note[i] = 'About right, so the next one is a minute longer.';
+    feel.log.push(`${w} about right: a minute longer next time.`);
+  }
+  if (!wasLit && feel.done[i] >= NEED) light();
+  drawFeel();
+}
+document.querySelectorAll('#feel-ask button').forEach((b) => b.addEventListener('click', () => feelAnswer(b.dataset.f)));
+
+/* ───────── 2 · Moon ───────── */
+const NIGHTS = [
+  ['balance', 3], ['balance', 3], ['alertness', 3], ['recovery', 3], ['recovery', 4], ['body', 4], ['body', 5, 'rest'],
+  ['movement', 5], ['movement', 5], ['senses', 5], ['senses', 6], ['concentration', 5], ['stillness', 5], ['recovery', 6, 'rest'],
+  ['concentration', 6], ['stillness', 6], ['control', 6], ['control', 7], ['discipline', 6], ['discipline', 7], ['senses', 8, 'rest'],
+  ['activating', 2], ['discipline', 8], ['advanced', 5], ['control', 8], ['activating', 3], ['advanced', 7], ['advanced', 10],
+];
+const firstNight = {}; NIGHTS.forEach(([id], n) => { if (!(id in firstNight)) firstNight[id] = n; });
+let moon = { night: 0 };
+// f: 0 new, 1 full. Lit part grows from the right.
+function moonPath(f, r) {
+  const rx = r * Math.abs(1 - 2 * f), sweep = f < .5 ? 0 : 1;
+  return `M0,${-r} A${r},${r} 0 0 1 0,${r} A${rx},${r} 0 0 ${sweep} 0,${-r}Z`;
+}
+const moonSvg = (f, r, lit) => `<circle r="${r}" fill="${lit ? '#2a2a33' : '#16171f'}" stroke="rgba(234,223,203,.12)"/>
+  <path d="${moonPath(f, r)}" fill="${lit ? '#f3e6cb' : 'rgba(243,230,203,.16)'}"/>`;
+function drawMoon() {
+  const n = moon.night;
+  document.getElementById('bigmoon').innerHTML = moonSvg(Math.min(1, n / 27), 44, true);
+  document.getElementById('moons').innerHTML = NIGHTS.map(([id, min, rest], i) => {
+    const st = i < n ? 'done' : i === n ? 'today' : '';
+    return `<div class="night ${st}"><svg viewBox="-20 -20 40 40">${moonSvg((i + 1) / 28, 15, i <= n)}</svg>
+      <span class="t">${T[id].word}<br>${min}m${firstNight[id] === i ? ' ✦' : ''}</span></div>`;
+  }).join('');
+  const box = document.getElementById('moon-next');
+  if (n >= 28) { box.innerHTML = `<div class="k">Full moon</div><div class="w">All 28 nights</div><p class="why">The course is done. Every breath stays open in the menu.</p>`; return; }
+  const [id, min, rest] = NIGHTS[n], isNew = firstNight[id] === n;
+  box.innerHTML = `<div class="k">Tonight · night ${n + 1} of 28</div>
+    <div class="w">${T[id].word}</div><div class="n">${T[id].name}${T[id].sub ? ' · ' + T[id].sub : ''}</div>
+    <div class="c">${say(id)} &nbsp;·&nbsp; ${min} min</div>
+    <p class="why">${isNew ? 'New tonight. ' + LADDER.find((L) => L.id === id).why : rest ? 'An easy night, a breath you already know, a little longer.' : 'Again, a little longer than last time.'}</p>
+    <span class="tag">✦ marks a night a new breath comes in</span>`;
+}
+function moonFinish() { if (moon.night < 28) moon.night++; drawMoon(); }
+
+/* ───────── 3 · Lotus ───────── */
+let lotus, asking = false;
+function lotusReset() { lotus = { at: 0, open: 0, min: LADDER[0].min, eased: false, here: 0, log: [] }; asking = false; }
+function petal(len, w) { return `M0,0 C${w},${-len * .35} ${w * .8},${-len * .8} 0,${-len} C${-w * .8},${-len * .8} ${-w},${-len * .35} 0,0Z`; }
+function drawLotus() {
+  const svg = document.getElementById('lotus');
+  let s = `<defs><radialGradient id="pg" cx="50%" cy="100%" r="100%"><stop offset="0" stop-color="#fff4ef"/><stop offset=".55" stop-color="#f6b8c8"/><stop offset="1" stop-color="#c76a8c"/></radialGradient></defs>`;
+  // lily pad under the flower
+  s += `<path d="M0,0 L162,-26 A164,164 0 1 0 162,26 Z" transform="rotate(-60)" fill="#10332c" opacity=".75"/>`;
+  // outer ring (expert) first so inner sits on top
+  const rings = [{ lvl: 2, len: 150, w: 52, off: 0 }, { lvl: 1, len: 108, w: 40, off: 45 }, { lvl: 0, len: 66, w: 28, off: 0 }];
+  rings.forEach((R) => {
+    const idx = LADDER.map((L, i) => [L, i]).filter(([L]) => L.lvl === R.lvl);
+    idx.forEach(([L, i], k) => {
+      const cls = `petal ${i < lotus.open ? 'open' : ''} ${i === lotus.at ? 'now' : ''}`;
+      s += `<path class="${cls}" d="${petal(R.len, R.w)}" transform="rotate(${R.off + k * 90})"/>`;
+    });
+  });
+  s += `<circle r="12" fill="#f2cf7a" opacity="${.35 + lotus.open / 18}"/>`;
+  svg.innerHTML = s;
+  document.getElementById('ask').classList.toggle('on', asking);
+  const box = document.getElementById('lotus-next');
+  if (lotus.at >= 12) { box.innerHTML = `<div class="k">In full bloom</div><div class="w">All twelve</div><p class="why">Every petal is open.</p>`; }
+  else {
+    const L = LADDER[lotus.at], x = T[L.id];
+    const t = lotus.eased ? x.t.map((v, j) => (j === 1 || j === 3) ? Math.ceil(v / 2) : j === 2 && v > x.t[0] ? Math.max(x.t[0], v - 2) : v) : x.t;
+    box.innerHTML = `<div class="k">${LVL[L.lvl]} · petal ${lotus.at + 1} of 12</div>
+      <div class="w">${x.word}</div><div class="n">${x.name}${x.sub ? ' · ' + x.sub : ''}</div>
+      <div class="c">${say(L.id, t)} &nbsp;·&nbsp; ${lotus.min} min</div>
+      <p class="why">${lotus.eased ? 'Eased for now: shorter holds and breath out. It steps back up when it feels easy.' : L.why}</p>`;
+  }
+  document.getElementById('lotus-log').innerHTML = lotus.log.slice(-4).reverse().map((x) => `<li>${x}</li>`).join('');
+}
+function lotusFinish() { if (lotus.at >= 12 || asking) return; asking = true; drawLotus(); }
+function lotusFeel(f) {
+  const L = LADDER[lotus.at], w = T[L.id].word;
+  asking = false; lotus.here++;
+  if (f === 'easy' && lotus.eased) { lotus.eased = false; lotus.log.push(`${w} felt easy, back to full counts`); }
+  else if (f === 'easy' || (f === 'right' && lotus.here >= 3)) {
+    lotus.log.push(`${w} ${f === 'easy' ? 'felt easy' : 'settled in'}, a petal opens`);
+    lotus.open = ++lotus.at; lotus.here = 0; lotus.eased = false;
+    if (lotus.at < 12) lotus.min = LADDER[lotus.at].min;
+  } else if (f === 'right') { lotus.min += 1; lotus.log.push(`${w} about right, next one a minute longer`); }
+  else { lotus.eased = true; lotus.min = Math.max(2, lotus.min - 1); lotus.log.push(`${w} felt hard, eased and a minute shorter`); }
+  drawLotus();
+}
+document.querySelectorAll('#ask button').forEach((b) => b.addEventListener('click', () => lotusFeel(b.dataset.f)));
+
+/* ───────── wiring ───────── */
+let view = location.hash.slice(1) || 'feel';
+function show(v) {
+  view = v; history.replaceState(null, '', '#' + v);
+  document.querySelectorAll('.switch button').forEach((b) => b.classList.toggle('on', b.dataset.v === v));
+  document.querySelectorAll('.view').forEach((s) => s.classList.toggle('on', s.id === 'v-' + v));
+}
+document.querySelectorAll('.switch button').forEach((b) => b.addEventListener('click', () => show(b.dataset.v)));
+document.getElementById('go').addEventListener('click', () => ({ feel: feelFinish, sky: skyFinish, moon: moonFinish, lotus: lotusFinish })[view]());
+document.getElementById('reset').addEventListener('click', () => {
+  if (view === 'feel') { feelReset(); drawFeel(); }
+  if (view === 'sky') { sky = { done: Array(12).fill(0), sel: 0 }; drawSky(); }
+  if (view === 'moon') { moon.night = 0; drawMoon(); }
+  if (view === 'lotus') { lotusReset(); drawLotus(); }
+});
+feelReset(); drawFeel(); lotusReset(); drawSky(); drawMoon(); drawLotus(); show(view);
+</script>
+</body>
+</html>
