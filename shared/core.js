@@ -46,11 +46,12 @@
     long: { label: 'Long', inhale: 5000, exhale: 8000, hold: 4000 },
   };
   // Choose a pace (short, steady, long) with or without a hold, or a technique by its id.
-  // `pace` is set only for your own pace; `id` is the pace or technique.
-  Spa.setPattern = (id, hold) => {
+  // `pace` is set only for your own pace; `id` is the pace or technique. `counts` replaces a
+  // technique's own seconds (the program's eased version).
+  Spa.setPattern = (id, hold, counts) => {
     const T = Spa.technique(id);
     let t, pace = null, say = {}, parts = null;
-    if (T) { t = T.t.map((x) => x * 1000); say = T.say || {}; parts = T.parts || null; hold = false; }
+    if (T) { t = (counts || T.t).map((x) => x * 1000); say = T.say || {}; parts = T.parts || null; hold = false; }
     else {
       pace = Spa.PACES[id] ? id : 'steady'; // an unknown saved choice goes back to Steady
       id = pace; hold = !!hold;
@@ -88,7 +89,7 @@
 
   Spa.AFTERCARE = [
     'Take a slow sip of water before you rise.',
-    'Stretch gently, and move slowly for a while.',
+    'Stretch, and move slowly for a while.',
     'Carry a little of this stillness with you.',
     'Notice your shoulders. Let them stay soft.',
     'There is no hurry. Return when you are ready.',
@@ -778,20 +779,19 @@
     //   Sleep: breathes at the Long pace, and ends with no bells and no vibration.
     //   Steady: your own pace (Short / Steady / Long, and Hold). Picking it sets Steady + Hold;
     //   during a session the pace row sits above the controls, so it can change mid-breath.
-    //   Breath: a breathing technique, chosen from the breath menu, which pops up.
-    // During a Breath session the button at the top right (with the controls) opens the menu;
-    // a change mid-session starts with the next breath.
-    // Holding a technique draws an outline round it and makes it a favorite, which moves it to
-    // the top; holding a favorite again unwinds the outline.
-    const MODES = { sleep: 'Sleep', steady: 'Steady', breath: 'Breath' };
+    //   Program: a star picked from the program at the top (shared/program.js); its breath and
+    //   length. The complete screen then asks how it was. (Replaced the Breath orb, 2026-11-27;
+    //   the technique grid and favorites in the breath menu are no longer reached.)
+    const MODES = { sleep: 'Sleep', steady: 'Steady' };
+    const PROG = Spa.program;
     const prefs = Spa.store('breath'); // shared by every room
     let favs = prefs.get('favorites', []).filter((id) => Spa.technique(id));
     let lastPace = Spa.PACES[prefs.get('pace')] ? prefs.get('pace') : 'steady';
     let lastHold = !!prefs.get('hold', false);
-    const oldTech = Spa.technique(prefs.get('choice')) ? prefs.get('choice') : null; // from before modes
-    let lastTech = Spa.technique(prefs.get('tech')) ? prefs.get('tech') : oldTech || 'balance';
-    let mode = MODES[prefs.get('mode')] ? prefs.get('mode') : oldTech ? 'breath' : 'steady';
-    const modePattern = (m = mode) => (m === 'sleep' ? ['long', false] : m === 'breath' ? [lastTech] : [lastPace, lastHold]);
+    const saved = prefs.get('mode');
+    let mode = MODES[saved] ? saved : (saved === 'program' || saved === 'breath') && PROG ? 'program' : 'steady';
+    const progPattern = () => { const S = PROG.star(); return [S.id, false, S.counts]; };
+    const modePattern = (m = mode) => (m === 'sleep' ? ['long', false] : m === 'program' ? progPattern() : [lastPace, lastHold]);
     // A mode's pattern, without choosing it.
     const patternFor = (m) => { const keep = Spa.pattern; Spa.setPattern(...modePattern(m)); const P = Spa.pattern; Spa.pattern = keep; return P; };
     Spa.setPattern(...modePattern());
@@ -814,7 +814,8 @@
       </div>
       <div class="mode-more">
         <button type="button" class="mode-pick" aria-haspopup="dialog"><span></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
-        <p class="mode-sleep">Ends softly · no bells, no buzz</p>
+        <p class="mode-sleep">Ends quietly · no bells, no buzz</p>
+        <p class="mode-prog"></p>
       </div>`;
     $('.options').prepend(modeBox);
 
@@ -868,14 +869,23 @@
       audio.ensure(); audio.tick(1.2);
     }));
     function chooseMode(m) {
-      const again = m === mode;
       mode = m;
       prefs.set('mode', m);
       if (m === 'steady') { lastPace = 'steady'; lastHold = true; } // Steady starts as Steady + Hold
       setBreath(...modePattern());
       audio.ensure(); audio.tick(1.3);
-      if (m === 'breath' && !again) openMenu();
     }
+
+    // The program's stars at the top of the setup screen. Picking one chooses the Program
+    // mode, its breath and its length.
+    const prog = PROG?.mount($('.setup'), (i) => {
+      if (!PROG.select(i)) return;
+      mode = 'program';
+      prefs.set('mode', mode);
+      setBreath(...modePattern());
+      setMinutes(PROG.star().min);
+      audio.ensure(); audio.tick(1.3);
+    });
     modeBox.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => chooseMode(b.dataset.mode)));
     const MODE_KEYS = Object.keys(MODES);
 
@@ -989,9 +999,11 @@
       paceAll('[data-pace]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.pace === P.pace)));
       paceAll('.hold-toggle').forEach((b) => b.setAttribute('aria-pressed', String(!!P.pace && P.hold)));
       modeBox.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mode === mode)));
-      const pick = mode === 'breath' ? Spa.technique(lastTech).word : `${Spa.PACES[lastPace].label}${lastHold ? ' · Hold' : ''}`;
+      const pick = `${Spa.PACES[lastPace].label}${lastHold ? ' · Hold' : ''}`;
       modeBox.querySelector('.mode-pick span').textContent = pick;
-      modeBox.querySelector('.mode-pick').setAttribute('aria-label', `${mode === 'breath' ? 'Technique' : 'Pace'}: ${pick}. Change`);
+      modeBox.querySelector('.mode-pick').setAttribute('aria-label', `Pace: ${pick}. Change`);
+      prog?.render(mode === 'program');
+      if (mode === 'program') modeBox.querySelector('.mode-prog').textContent = Spa.patternCounts(P);
       main.dataset.mode = menu.dataset.mode = mode;
       orbPat = Object.fromEntries(MODE_KEYS.map((m) => [m, patternFor(m)]));
       Object.values(techBtn).forEach((b) => b.setAttribute('aria-checked', String(b.dataset.tech === P.id)));
@@ -1003,11 +1015,11 @@
       Spa.setPattern(id, hold);
       const P = Spa.pattern;
       if (mode === 'steady') { lastPace = P.pace; lastHold = P.hold; prefs.set('pace', lastPace); prefs.set('hold', lastHold); }
-      if (mode === 'breath') { lastTech = P.id; prefs.set('tech', lastTech); }
       renderBreath();
       if (st.phase === 'session') st.bChange = Math.floor(Math.max(0, st.bLocal) / st.bPat.cycle); // switch once this breath ends
     }
     arrange(false);
+    if (mode === 'program') st.minutes = snap(PROG.star().min);
     renderBreath();
 
     // The session's breath clock. It runs on the pattern it began with until a new one is
@@ -1071,8 +1083,27 @@
       if (!persist && !st.paused) showControls.t = setTimeout(() => main.classList.remove('show-controls'), 4500);
     }
 
+    // After a session from the program: "How was that?" on the complete screen.
+    const ask = document.createElement('div');
+    ask.className = 'prog-ask';
+    ask.innerHTML = `<p class="prog-q">How was that?</p>
+      <div class="prog-row"><button type="button" data-f="easy">Easy</button><button type="button" data-f="right">About right</button><button type="button" data-f="hard">Hard</button></div>
+      <p class="prog-said" aria-live="polite"></p>`;
+    $('#again')?.before(ask);
+    ask.querySelectorAll('[data-f]').forEach((b) => b.addEventListener('click', () => {
+      if (st.progStar == null) return;
+      const said = PROG.answer(st.progStar, b.dataset.f);
+      track(`program/${PROG.LADDER[st.progStar].id}/${b.dataset.f}`);
+      st.progStar = null;
+      ask.querySelector('.prog-said').textContent = said;
+      ask.classList.add('answered');
+      audio.tick(1.3);
+      if (mode === 'program') { setBreath(...modePattern()); setMinutes(PROG.star().min); }
+    }));
+
     function begin() {
       audio.ensure();
+      st.progStar = mode === 'program' ? PROG.star().i : null;
       // The session runs the settle, the opening inhale (and its hold) and the timer;
       // st.remaining counts down the whole span.
       st.total = st.minutes * 60000;
@@ -1141,6 +1172,11 @@
         vibrate([500, 250, 500, 250, 500]);
       }
       const m = Math.round(rested / 60000);
+      // Ask only when the program's session ran at least a minute.
+      if (st.progStar != null && rested < 60000) st.progStar = null;
+      ask.classList.toggle('on', st.progStar != null);
+      ask.classList.remove('answered');
+      ask.querySelector('.prog-said').textContent = '';
       el.rested.textContent = m < 1 ? 'You took a quiet moment.' : `You rested for ${Spa.fmtDuration(m)}.`;
       el.aftercare.textContent = Spa.AFTERCARE[Math.floor(Math.random() * Spa.AFTERCARE.length)];
       Spa.wake.off();

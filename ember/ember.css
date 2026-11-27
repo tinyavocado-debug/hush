@@ -24,6 +24,7 @@ body {
 }
 
 /* ───────── setup ───────── */
+@media (max-height: 760px) { .stage { min-height: 140px; } }
 .setup {
   justify-content: space-between;
   gap: 12px;

@@ -17,7 +17,8 @@ body {
 }
 
 /* ───────── setup ───────── */
-.setup { justify-content: space-between; gap: 12px; padding-top: calc(var(--safe-t) + 36px); }
+@media (max-height: 760px) { .stage { min-height: 140px; } }
+.setup { justify-content: space-between; gap: 12px; padding-top: calc(var(--safe-t) + 20px); }
 .stage {
   position: relative;
   flex: 1 1 auto;

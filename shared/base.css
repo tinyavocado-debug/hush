@@ -151,12 +151,15 @@ h1 {
 }
 .sounds button { font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; }
 
-/* The session's mode: Sleep / Steady / Breath as orbs, and below them the mode's own choice. */
+/* The session's mode: Sleep / Steady as orbs, and below them the mode's own choice.
+   A star picked in the program (above) is the third mode, Program. */
 .mode { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
 .mode-more { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 44px; }
 .mode-more > * { display: none; }
 main[data-mode="sleep"] .mode-sleep { display: block; }
-main:is([data-mode="steady"], [data-mode="breath"]) .mode-pick { display: flex; }
+main[data-mode="steady"] .mode-pick { display: flex; }
+main[data-mode="program"] .mode-prog { display: block; }
+.mode-prog { margin: 0; font: italic 300 18px/1 var(--serif); letter-spacing: 0.03em; color: var(--ink-soft); }
 .mode-sleep { margin: 0; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-faint); }
 .mode-pick {
   align-items: center;
@@ -216,7 +219,7 @@ main:is([data-mode="steady"], [data-mode="breath"]) .mode-pick { display: flex; 
 .breath-open-word { font: italic 300 17px/1 var(--serif); letter-spacing: 0.03em; white-space: nowrap; }
 main.show-controls .breath-open { opacity: 1; pointer-events: auto; transform: none; }
 /* On the setup screen the mode row does its job; Sleep has nothing to change mid-session. */
-main[data-state="setup"] .breath-open, main:is([data-mode="sleep"], [data-mode="steady"]) .breath-open { display: none; }
+main[data-state="setup"] .breath-open, main:is([data-mode="sleep"], [data-mode="steady"], [data-mode="program"]) .breath-open { display: none; }
 .breath-open:active { transform: scale(0.97); }
 main.show-controls .hint { opacity: 0; } /* the tap hint shares the top of the screen */
 
@@ -470,6 +473,55 @@ main.paused .ctrl .i-play { display: block; }
 .ctrl .i-off, main.muted .ctrl .i-on { display: none; }
 main.muted .ctrl .i-off { display: block; }
 .ctrl:active svg { transform: scale(0.94); }
+
+/* ───────── program (shared/program.js) ─────────
+   A row of twelve stars at the top of the setup screen, beginner bottom left to expert top right.
+   Its own small screen: a framed window of night sky, between the two corner buttons. */
+.prog {
+  flex: none;
+  width: min(340px, calc(100% - 84px));
+  padding: 6px 10px 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(2, 3, 12, 0.55), rgba(2, 3, 12, 0.3));
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.6s;
+}
+.prog.on { border-color: color-mix(in srgb, var(--ink) 30%, transparent); }
+.prog-sky { width: 100%; height: clamp(44px, 8vh, 80px); overflow: visible; }
+.prog-star[data-i] { cursor: pointer; }
+.prog-star:focus { outline: none; }
+.prog-star:focus-visible .prog-halo { opacity: 0.5; }
+.prog-halo { fill: var(--glow); opacity: 0; }
+.prog-star.lit .prog-halo { opacity: 0.35; }
+.prog-star.now .prog-halo { opacity: 0.5; animation: prog-breathe 6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.prog-star.eased .prog-halo { fill: rgba(150, 190, 255, 0.5); }
+.prog-star.sel .prog-core { fill: #fff; filter: drop-shadow(0 0 4px #fff); }
+@keyframes prog-breathe { 0%, 100% { transform: scale(0.7); } 50% { transform: scale(1.3); } }
+.prog-core { fill: color-mix(in srgb, var(--ink) 38%, transparent); }
+.prog-star.lit .prog-core, .prog-star.now .prog-core { fill: var(--ink); }
+.prog-pip { fill: none; stroke: color-mix(in srgb, var(--ink) 35%, transparent); stroke-width: 0.8; }
+.prog-pip.done { fill: var(--ink); stroke: none; }
+.prog-link { stroke: color-mix(in srgb, var(--ink) 45%, transparent); stroke-width: 0.8; }
+.prog-link.dim { stroke: color-mix(in srgb, var(--ink) 22%, transparent); stroke-dasharray: 2 3; }
+.prog-line { margin: 0; display: flex; justify-content: center; width: 100%; align-items: baseline; gap: 10px; cursor: pointer; color: var(--ink-faint); }
+.prog-k, .prog-c { font-size: 9px; letter-spacing: 0.18em; white-space: nowrap; text-transform: uppercase; }
+.prog-w { font: italic 300 19px/1 var(--serif); color: var(--ink-soft); }
+.prog-k { flex: 1; text-align: right; } .prog-c { flex: 1; text-align: left; }
+.prog.on .prog-w { color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .prog-star.now .prog-halo { animation: none; } }
+@media (orientation: landscape) and (max-height: 540px) { .prog { display: none; } }
+
+/* After a program session: How was that? */
+.prog-ask { display: none; margin: 26px 0 6px; }
+.prog-ask.on { display: block; }
+.prog-q { margin: 0 0 12px; font: italic 300 22px/1.2 var(--serif); color: var(--ink); }
+.prog-row { display: flex; gap: 8px; justify-content: center; }
+.prog-row button { height: 42px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); }
+.prog-row button:active { transform: scale(0.97); }
+.prog-ask.answered .prog-row, .prog-ask.answered .prog-q { display: none; }
+.prog-said { margin: 0 auto; max-width: 30ch; font: italic 300 19px/1.4 var(--serif); color: var(--ink-soft); }
 
 /* ───────── complete ───────── */
 .complete { text-align: center; }
