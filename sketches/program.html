@@ -43,7 +43,7 @@
   .view { display: none; } .view.on { display: block; }
 
   /* 1 · Constellations */
-  #sky { width: 100%; height: auto; display: block; border-radius: 22px;
+  #sky, #feelsky { width: 100%; height: auto; display: block; border-radius: 22px;
     background: radial-gradient(120% 70% at 50% 100%, #1a1438 0%, #0b0d1c 55%, #06070d 100%); }
   .lvl { font: italic 300 15px var(--serif); fill: var(--faint); letter-spacing: .04em; }
   .star { cursor: pointer; }
@@ -56,6 +56,8 @@
   .star .lab { font-size: 10.5px; fill: var(--faint); letter-spacing: .06em; }
   .star.lit .lab, .star.now .lab { fill: var(--soft); }
   .star.sel .lab { fill: var(--ink); font-weight: 400; }
+  .star.eased .halo { fill: #9fc7ff; }
+  .delta { color: var(--faint); font-size: 12px; }
   .pip { fill: none; stroke: rgba(234,223,203,.25); stroke-width: 1; }
   .pip.done { fill: #fff6e6; stroke: none; }
   .link { stroke: rgba(205,184,255,.5); stroke-width: 1; fill: none; }
@@ -91,14 +93,29 @@
 </head>
 <body>
 <nav class="switch">
-  <button data-v="sky" class="on">1 · Constellations</button>
+  <button data-v="feel" class="on">Sky + feel</button>
+  <button data-v="sky">1 · Constellations</button>
   <button data-v="moon">2 · Moon</button>
   <button data-v="lotus">3 · Lotus</button>
 </nav>
 
 <main class="wrap">
+  <!-- 0 -->
+  <section class="view on" id="v-feel">
+    <p class="eyebrow">At your own pace, and it listens</p>
+    <h1>Constellations</h1>
+    <p class="lede">After each session you say how it felt. Easy lights the star and opens the next. About right counts a session and adds a minute. Hard eases the counts.</p>
+    <svg id="feelsky" viewBox="0 0 360 620"></svg>
+    <div class="ask" id="feel-ask">
+      <p>How was that?</p>
+      <div class="row"><button data-f="easy">Easy</button><button data-f="right">About right</button><button data-f="hard">Hard</button></div>
+    </div>
+    <div class="next" id="feel-next"></div>
+    <ul class="log" id="feel-log"></ul>
+  </section>
+
   <!-- 1 -->
-  <section class="view on" id="v-sky">
+  <section class="view" id="v-sky">
     <p class="eyebrow">At your own pace</p>
     <h1>Constellations</h1>
     <p class="lede">Twelve stars, climbing from the beginner sky at the bottom to the expert sky at the top. Three sessions light a star and open the next one.</p>
@@ -174,27 +191,32 @@ const POS = [ // bottom (beginner) to top (expert)
 ];
 let sky = { done: Array(12).fill(0), sel: 0 };
 const skyNow = () => sky.done.findIndex((d) => d < NEED);
-function drawSky() {
-  const now = skyNow(), svg = document.getElementById('sky');
+// Draws the sky. st: { done[], sel }, isLit(i), eased(i) optional, onSel(i).
+function paintSky(svg, st, isLit, onSel, eased = () => false) {
+  const now = LADDER.findIndex((_, i) => !isLit(i));
   let s = '';
   // background specks
   for (let i = 0; i < 70; i++) { const x = (i * 97) % 360, y = (i * 211) % 620; s += `<circle cx="${x}" cy="${y}" r="${(i % 3) * .3 + .3}" fill="#fff" opacity="${.08 + (i % 5) * .04}"/>`; }
   s += `<text class="lvl" x="16" y="604">Beginner</text><text class="lvl" x="16" y="440">Intermediate</text><text class="lvl" x="16" y="196">Expert</text>`;
   for (let i = 0; i < 11; i++) {
     const [a, b] = [POS[i], POS[i + 1]];
-    s += `<line class="link ${sky.done[i] >= NEED ? '' : 'dim'}" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/>`;
+    s += `<line class="link ${isLit(i) ? '' : 'dim'}" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/>`;
   }
   LADDER.forEach((L, i) => {
-    const [x, y] = POS[i], lit = sky.done[i] >= NEED, isNow = i === now;
-    const cls = `star ${lit ? 'lit' : ''} ${isNow ? 'now' : ''} ${i === sky.sel ? 'sel' : ''}`;
+    const [x, y] = POS[i], lit = isLit(i), isNow = i === now;
+    const cls = `star ${lit ? 'lit' : ''} ${isNow ? 'now' : ''} ${i === st.sel ? 'sel' : ''} ${eased(i) ? 'eased' : ''}`;
     let pips = '';
-    for (let k = 0; k < NEED; k++) pips += `<circle class="pip ${k < sky.done[i] ? 'done' : ''}" cx="${x - 8 + k * 8}" cy="${y + 14}" r="2"/>`;
+    for (let k = 0; k < NEED; k++) pips += `<circle class="pip ${lit || k < st.done[i] ? 'done' : ''}" cx="${x - 8 + k * 8}" cy="${y + 14}" r="2"/>`;
     s += `<g class="${cls}" data-i="${i}"><circle class="halo" cx="${x}" cy="${y}" r="16"/><circle class="core" cx="${x}" cy="${y}" r="${lit || isNow ? 3.4 : 2.2}"/>
       ${lit || isNow ? pips : ''}<text class="lab" x="${x}" y="${y - 12}" text-anchor="middle">${T[L.id].word}</text>
       <circle cx="${x}" cy="${y}" r="20" fill="transparent"/></g>`;
   });
   svg.innerHTML = s;
-  svg.querySelectorAll('.star').forEach((g) => g.addEventListener('click', () => { sky.sel = +g.dataset.i; drawSky(); }));
+  svg.querySelectorAll('.star').forEach((g) => g.addEventListener('click', () => onSel(+g.dataset.i)));
+  return now;
+}
+function drawSky() {
+  const now = paintSky(document.getElementById('sky'), sky, (i) => sky.done[i] >= NEED, (i) => { sky.sel = i; drawSky(); });
   const i = sky.sel, L = LADDER[i], open = i <= now || now < 0;
   document.getElementById('sky-next').innerHTML = `
     <div class="k">${LVL[L.lvl]} · star ${i + 1} of 12</div>
@@ -210,6 +232,73 @@ function skyFinish() {
   if (sky.done[i] >= NEED && i === now && now < 11) sky.sel = now + 1;
   drawSky();
 }
+
+/* ───────── 0 · Constellations + "How was that?" ───────── */
+// Easy: the star lights now and the next one opens (expert stars need 2 sessions first).
+// About right: a session counts and the next one is a minute longer. 3 sessions light it.
+// Hard: no session counted, holds halved and a minute shorter, until it feels easy again.
+const EXPERT_MIN = 2, MAX_EXTRA = 4;
+const easeT = (x) => x.t.map((v, j) => (j === 1 || j === 3) ? Math.ceil(v / 2) : j === 2 && v > x.t[0] ? Math.max(x.t[0], v - 2) : v);
+let feel, feelAsk = false;
+function feelReset() {
+  feel = { done: Array(12).fill(0), lit: Array(12).fill(false), min: LADDER.map((L) => L.min), eased: Array(12).fill(false), note: Array(12).fill(''), sel: 0, log: [] };
+  feelAsk = false;
+}
+function drawFeel() {
+  const now = paintSky(document.getElementById('feelsky'), feel, (i) => feel.lit[i], (i) => { if (!feelAsk) { feel.sel = i; drawFeel(); } }, (i) => feel.eased[i]);
+  document.getElementById('feel-ask').classList.toggle('on', feelAsk);
+  const i = feel.sel, L = LADDER[i], x = T[L.id], open = i <= now || now < 0;
+  const t = feel.eased[i] ? easeT(x) : x.t;
+  const delta = feel.min[i] - L.min;
+  document.getElementById('feel-next').innerHTML = `
+    <div class="k">${LVL[L.lvl]} · star ${i + 1} of 12</div>
+    <div class="w">${x.word}</div><div class="n">${x.name}${x.sub ? ' · ' + x.sub : ''}</div>
+    <div class="c">${say(L.id, t)} &nbsp;·&nbsp; ${feel.min[i]} min${delta ? ` <span class="delta">(${delta > 0 ? '+' : ''}${delta})</span>` : ''}</div>
+    <p class="why">${!open ? 'Still dark. Light the stars before it to reach it.' : feel.note[i] || L.why}</p>
+    <span class="tag">${feel.lit[i] ? 'Lit. Come back to it any time.' : open ? `${feel.done[i]} of ${NEED} sessions${feel.eased[i] ? ' · eased' : ''}` : 'Locked'}</span>`;
+  document.getElementById('feel-log').innerHTML = feel.log.slice(-5).reverse().map((x) => `<li>${x}</li>`).join('');
+}
+function feelFinish() {
+  const now = feel.lit.indexOf(false);
+  if (now < 0 || feelAsk) return;
+  if (feel.sel > now) feel.sel = now;
+  feelAsk = true; drawFeel();
+  document.getElementById('feel-ask').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function feelAnswer(f) {
+  const i = feel.sel, L = LADDER[i], w = T[L.id].word, wasLit = feel.lit[i];
+  feelAsk = false;
+  const light = () => {
+    feel.lit[i] = true;
+    const nx = feel.lit.indexOf(false);
+    if (nx >= 0) { feel.sel = nx; feel.log.push(`${w} is lit. ${T[LADDER[nx].id].word} opens.`); }
+    else feel.log.push(`${w} is lit. The whole sky is lit.`);
+  };
+  if (f === 'hard') {
+    feel.min[i] = Math.max(2, feel.min[i] - 1);
+    if (!feel.eased[i]) { feel.eased[i] = true; feel.note[i] = 'Eased for now: shorter holds and a shorter breath out. Say Easy to go back to full counts.'; }
+    else feel.note[i] = 'Still eased, and a minute shorter.';
+    feel.log.push(`${w} felt hard: eased and a minute shorter.`);
+  } else if (f === 'easy' && feel.eased[i]) {
+    feel.eased[i] = false; feel.done[i]++; feel.min[i] = Math.max(feel.min[i], L.min);
+    feel.note[i] = 'Back to full counts and the usual length.';
+    feel.log.push(`${w} felt easy: back to full counts and the usual length.`);
+    if (!wasLit && feel.done[i] >= NEED) light();
+  } else if (f === 'easy') {
+    feel.done[i]++;
+    if (wasLit) { feel.min[i] = Math.min(L.min + MAX_EXTRA, feel.min[i] + 1); feel.log.push(`${w} felt easy: a minute longer next time.`); }
+    else if (L.lvl === 2 && feel.done[i] < EXPERT_MIN) { feel.note[i] = 'Expert stars need two sessions. Once more and an easy one lights it.'; feel.log.push(`${w} felt easy: one more before this expert star lights.`); }
+    else light();
+  } else { // about right
+    feel.done[i]++;
+    feel.min[i] = Math.min(L.min + MAX_EXTRA, feel.min[i] + 1);
+    feel.note[i] = 'About right, so the next one is a minute longer.';
+    feel.log.push(`${w} about right: a minute longer next time.`);
+    if (!wasLit && feel.done[i] >= NEED) light();
+  }
+  drawFeel();
+}
+document.querySelectorAll('#feel-ask button').forEach((b) => b.addEventListener('click', () => feelAnswer(b.dataset.f)));
 
 /* ───────── 2 · Moon ───────── */
 const NIGHTS = [
@@ -295,20 +384,21 @@ function lotusFeel(f) {
 document.querySelectorAll('#ask button').forEach((b) => b.addEventListener('click', () => lotusFeel(b.dataset.f)));
 
 /* ───────── wiring ───────── */
-let view = location.hash.slice(1) || 'sky';
+let view = location.hash.slice(1) || 'feel';
 function show(v) {
   view = v; history.replaceState(null, '', '#' + v);
   document.querySelectorAll('.switch button').forEach((b) => b.classList.toggle('on', b.dataset.v === v));
   document.querySelectorAll('.view').forEach((s) => s.classList.toggle('on', s.id === 'v-' + v));
 }
 document.querySelectorAll('.switch button').forEach((b) => b.addEventListener('click', () => show(b.dataset.v)));
-document.getElementById('go').addEventListener('click', () => ({ sky: skyFinish, moon: moonFinish, lotus: lotusFinish })[view]());
+document.getElementById('go').addEventListener('click', () => ({ feel: feelFinish, sky: skyFinish, moon: moonFinish, lotus: lotusFinish })[view]());
 document.getElementById('reset').addEventListener('click', () => {
+  if (view === 'feel') { feelReset(); drawFeel(); }
   if (view === 'sky') { sky = { done: Array(12).fill(0), sel: 0 }; drawSky(); }
   if (view === 'moon') { moon.night = 0; drawMoon(); }
   if (view === 'lotus') { lotusReset(); drawLotus(); }
 });
-lotusReset(); drawSky(); drawMoon(); drawLotus(); show(view);
+feelReset(); drawFeel(); lotusReset(); drawSky(); drawMoon(); drawLotus(); show(view);
 </script>
 </body>
 </html>
